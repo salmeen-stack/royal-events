@@ -209,8 +209,11 @@ const Sidebar = ({ isOpen, onClose }) => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar">
-        {filteredNav.map((section) => (
+      <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar scrollbar-hide">
+        <div className="relative">
+          {/* Gradient fade indicator at bottom */}
+          <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent pointer-events-none" />
+          {filteredNav.map((section) => (
           <div key={section.section}>
             {!isCollapsed && (
               <motion.p
@@ -279,6 +282,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             </div>
           </div>
         ))}
+        </div>
       </nav>
 
       {/* User Profile */}

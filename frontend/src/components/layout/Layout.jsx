@@ -30,7 +30,7 @@ const Layout = () => {
       />
 
       {/* Main Content */}
-      <div className="lg:pl-60 flex flex-col min-h-screen">
+      <div className="lg:pl-72 flex flex-col min-h-screen">
         {/* Header */}
         <Header onMenuToggle={() => setSidebarOpen(true)} />
 

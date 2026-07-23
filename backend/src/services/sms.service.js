@@ -32,6 +32,10 @@ export const sendSMS = async ({ to, message, eventId = null, guestId = null, typ
     });
 
     // Send via Rafiki SMS API (v1/vendor/send-sms)
+    console.log("Sending SMS to:", phone);
+    console.log("Message length:", message.length);
+    console.log("Message:", message);
+    
     const response = await axios.post(
       `${RAFIKI_BASE_URL}/v1/vendor/send-sms`,
       {
@@ -48,6 +52,8 @@ export const sendSMS = async ({ to, message, eventId = null, guestId = null, typ
         timeout: 15000,
       }
     );
+
+    console.log("RafikiSMS Response:", JSON.stringify(response.data, null, 2));
 
     // Update notification as sent
     await prisma.notification.update({
@@ -67,15 +73,14 @@ export const sendSMS = async ({ to, message, eventId = null, guestId = null, typ
 
   } catch (error) {
     console.error("Send SMS error:", error.message);
+    console.error("Error response data:", error.response?.data);
+    console.error("Error response status:", error.response?.status);
+    console.error("Error response headers:", error.response?.headers);
 
-    // Update notification as failed if it was created
+    // Update the specific notification as failed if it was created
     try {
-      await prisma.notification.updateMany({
-        where: {
-          recipient: to.replace(/^\+/, ""),
-          status: "PENDING",
-          channel: "SMS",
-        },
+      await prisma.notification.update({
+        where: { id: notification.id },
         data: {
           status: "FAILED",
           failureReason: error.message,
