@@ -8,13 +8,13 @@ import {
   deleteEvent,
   getEventStats,
 } from "../controllers/event.controller.js";
-import { authenticate, isStaff } from "../middleware/auth.js";
+import { authenticate, isStaff, isEventOwner } from "../middleware/auth.js";
 
 const router = express.Router();
 
 router.use(authenticate);
 
-router.get("/", isStaff, getAllEvents);
+router.get("/", isEventOwner, getAllEvents);
 router.get("/:id", getEventById);
 router.get("/:id/stats", getEventStats);
 router.post("/", isStaff, createEvent);

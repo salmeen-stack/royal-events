@@ -10,12 +10,12 @@ import {
   manualCheckIn,
   getEventCheckInStats,
 } from "../controllers/checkin.controller.js";
-import { authenticate, isStaff } from "../middleware/auth.js";
+import { authenticate, isStaff, isEventOwner } from "../middleware/auth.js";
 
 const router = express.Router();
 
 router.use(authenticate);
-router.use(isStaff);
+router.use(isEventOwner);
 
 router.get("/", getAllCheckIns);
 router.get("/event/:eventId/stats", getEventCheckInStats);

@@ -5,10 +5,13 @@
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/500.css";
 @import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@import "./styles/design-system.css";
 
 * {
   margin: 0;
@@ -18,29 +21,55 @@
 
 body {
   font-family: "Inter", sans-serif;
-  background-color: #f8fafc;
-  color: #1e293b;
+  background-color: var(--color-gray-50);
+  color: var(--color-gray-900);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: var(--font-semibold);
+  color: var(--color-gray-900);
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+h1 {
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
+h2 {
+  font-size: var(--text-2xl);
+  line-height: var(--leading-tight);
 }
 
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+h3 {
+  font-size: var(--text-xl);
+  line-height: var(--leading-tight);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+h4 {
+  font-size: var(--text-lg);
+  line-height: var(--leading-tight);
+}
+
+a {
+  color: var(--color-primary-600);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--color-primary-700);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input, select, textarea {
+  font-family: inherit;
 }

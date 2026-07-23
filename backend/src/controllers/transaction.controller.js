@@ -15,6 +15,19 @@ export const getAllTransactions = async (req, res) => {
 
     const where = {};
 
+    // Filter by event owner if user is EVENT_OWNER
+    if (req.user.role === "EVENT_OWNER") {
+      const eventOwner = await prisma.eventOwner.findUnique({
+        where: { email: req.user.email },
+        include: { events: { select: { id: true } } },
+      });
+      if (eventOwner && eventOwner.events.length > 0) {
+        where.eventId = { in: eventOwner.events.map(e => e.id) };
+      } else {
+        where.eventId = "nonexistent";
+      }
+    }
+
     if (eventId) where.eventId = eventId;
     if (status) where.status = status;
 

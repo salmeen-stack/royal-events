@@ -9,7 +9,7 @@ import {
   deleteGuest,
   getContributionPage,
 } from "../controllers/guest.controller.js";
-import { authenticate, isStaff } from "../middleware/auth.js";
+import { authenticate, isStaff, isEventOwner } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -19,11 +19,11 @@ router.get("/contribute/:token", getContributionPage);
 // Protected routes
 router.use(authenticate);
 
-router.get("/", isStaff, getAllGuests);
-router.get("/:id", isStaff, getGuestById);
+router.get("/", isEventOwner, getAllGuests);
+router.get("/:id", isEventOwner, getGuestById);
 router.post("/", isStaff, createGuest);
 router.post("/bulk-import", isStaff, bulkImportGuests);
-router.put("/:id", isStaff, updateGuest);
+router.put("/:id", isEventOwner, updateGuest);
 router.delete("/:id", isStaff, deleteGuest);
 
 export default router;

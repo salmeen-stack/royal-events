@@ -8,17 +8,17 @@ import {
   getSystemReport,
   getCompleteEventReport,
 } from "../controllers/report.controller.js";
-import { authenticate, isStaff, isSuperAdmin } from "../middleware/auth.js";
+import { authenticate, isStaff, isSuperAdmin, isEventOwner } from "../middleware/auth.js";
 
 const router = express.Router();
 
 router.use(authenticate);
 
 router.get("/system", isStaff, getSystemReport);
-router.get("/event/:eventId/financial", isStaff, getEventFinancialReport);
-router.get("/event/:eventId/guests", isStaff, getEventGuestReport);
-router.get("/event/:eventId/invitations", isStaff, getEventInvitationReport);
-router.get("/event/:eventId/attendance", isStaff, getEventAttendanceReport);
-router.get("/event/:eventId/complete", isStaff, getCompleteEventReport);
+router.get("/event/:eventId/financial", isEventOwner, getEventFinancialReport);
+router.get("/event/:eventId/guests", isEventOwner, getEventGuestReport);
+router.get("/event/:eventId/invitations", isEventOwner, getEventInvitationReport);
+router.get("/event/:eventId/attendance", isEventOwner, getEventAttendanceReport);
+router.get("/event/:eventId/complete", isEventOwner, getCompleteEventReport);
 
 export default router;

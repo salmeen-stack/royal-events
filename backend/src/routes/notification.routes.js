@@ -8,12 +8,12 @@ import {
   sendBulkContributionReminders,
   getEventNotificationStats,
 } from "../controllers/notification.controller.js";
-import { authenticate, isStaff } from "../middleware/auth.js";
+import { authenticate, isStaff, isEventOwner } from "../middleware/auth.js";
 
 const router = express.Router();
 
 router.use(authenticate);
-router.use(isStaff);
+router.use(isEventOwner);
 
 router.get("/", getAllNotifications);
 router.get("/event/:eventId/stats", getEventNotificationStats);

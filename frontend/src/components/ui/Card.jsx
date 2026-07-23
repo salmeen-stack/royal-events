@@ -8,6 +8,7 @@ const Card = ({
   hover = false,
   animate = true,
   onClick,
+  variant = "default",
 }) => {
   const Component = animate ? motion.div : "div";
   const animateProps = animate
@@ -18,12 +19,19 @@ const Card = ({
       }
     : {};
 
+  const variantStyles = {
+    default: "bg-white rounded-2xl border border-gray-200 shadow-sm",
+    elevated: "bg-white rounded-2xl border-0 shadow-lg",
+    glass: "bg-white/80 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg",
+    gradient: "bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl border-0 shadow-lg text-white",
+  };
+
   return (
     <Component
       className={cn(
-        "bg-white rounded-xl border border-gray-100 shadow-sm",
+        variantStyles[variant],
         padding,
-        hover && "hover:shadow-md hover:border-gray-200 transition-all duration-200 cursor-pointer",
+        hover && "hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer",
         onClick && "cursor-pointer",
         className
       )}
@@ -39,7 +47,7 @@ const CardHeader = ({ children, className = "" }) => {
   return (
     <div
       className={cn(
-        "flex items-center justify-between pb-4 mb-4 border-b border-gray-100",
+        "flex items-center justify-between pb-5 mb-5 border-b border-gray-100",
         className
       )}
     >
@@ -50,9 +58,17 @@ const CardHeader = ({ children, className = "" }) => {
 
 const CardTitle = ({ children, icon, className = "" }) => {
   return (
-    <h3 className={cn("text-base font-semibold text-gray-900 flex items-center gap-2", className)}>
+    <h3 className={cn("text-lg font-semibold text-gray-900 flex items-center gap-2", className)}>
       {children}
     </h3>
+  );
+};
+
+const CardSubtitle = ({ children, className = "" }) => {
+  return (
+    <p className={cn("text-sm text-gray-500 mt-1", className)}>
+      {children}
+    </p>
   );
 };
 
@@ -64,7 +80,7 @@ const CardFooter = ({ children, className = "" }) => {
   return (
     <div
       className={cn(
-        "flex items-center justify-end gap-3 pt-4 mt-4 border-t border-gray-100",
+        "flex items-center justify-end gap-3 pt-5 mt-5 border-t border-gray-100",
         className
       )}
     >
@@ -75,6 +91,7 @@ const CardFooter = ({ children, className = "" }) => {
 
 Card.Header = CardHeader;
 Card.Title = CardTitle;
+Card.Subtitle = CardSubtitle;
 Card.Content = CardContent;
 Card.Footer = CardFooter;
 

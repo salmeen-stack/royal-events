@@ -4,6 +4,7 @@ import useAuthStore from "./store/authStore";
 import Layout from "./components/layout/Layout";
 import Login from "./pages/auth/Login";
 import Dashboard from "./pages/dashboard/Dashboard";
+import EventOwnerDashboard from "./pages/event-owner-dashboard/EventOwnerDashboard";
 import Events from "./pages/events/Events";
 import EventDetail from "./pages/events/EventDetail";
 import CreateEvent from "./pages/events/CreateEvent";
@@ -42,9 +43,17 @@ const PublicRoute = ({ children }) => {
 const RoleBasedRedirect = () => {
   const { user } = useAuthStore();
   if (user?.role === "EVENT_OWNER") {
-    return <Navigate to="/events" replace />;
+    return <Navigate to="/event-owner-dashboard" replace />;
   }
   return <Navigate to="/dashboard" replace />;
+};
+
+const DashboardRoute = () => {
+  const { user } = useAuthStore();
+  if (user?.role === "EVENT_OWNER") {
+    return <Navigate to="/event-owner-dashboard" replace />;
+  }
+  return <Dashboard />;
 };
 
 const App = () => {
@@ -91,7 +100,8 @@ const App = () => {
           }
         >
           <Route index element={<RoleBasedRedirect />} />
-          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="dashboard" element={<DashboardRoute />} />
+          <Route path="event-owner-dashboard" element={<EventOwnerDashboard />} />
           <Route path="events" element={<Events />} />
           <Route path="events/create" element={<CreateEvent />} />
           <Route path="events/:id" element={<EventDetail />} />

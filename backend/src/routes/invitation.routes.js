@@ -11,7 +11,7 @@ import {
   verifyBySMSToken,
   getInvitationQRCode,
 } from "../controllers/invitation.controller.js";
-import { authenticate, isStaff } from "../middleware/auth.js";
+import { authenticate, isStaff, isEventOwner } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -21,7 +21,7 @@ router.post("/verify/token", verifyBySMSToken);
 
 // Protected routes
 router.use(authenticate);
-router.use(isStaff);
+router.use(isEventOwner);
 
 router.get("/", getAllInvitations);
 router.get("/:id", getInvitationById);
