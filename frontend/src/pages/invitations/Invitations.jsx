@@ -17,8 +17,10 @@ import useDebounce from "../../hooks/useDebounce";
 import { formatDateTime } from "../../utils/formatters";
 import { getErrorMessage } from "../../utils/helpers";
 import { INVITATION_STATUS, INVITATION_CHANNELS } from "../../config/constants";
+import useAuthStore from "../../store/authStore";
 
 const Invitations = () => {
+  const { user } = useAuthStore();
   const [searchParams] = useSearchParams();
   const eventIdParam = searchParams.get("eventId") || "";
   const [invitations, setInvitations] = useState([]);
@@ -29,6 +31,8 @@ const Invitations = () => {
   const [generatingBulk, setGeneratingBulk] = useState(false);
   const debouncedSearch = useDebounce(search);
   const pagination = usePagination();
+
+  const canManageInvitations = user?.role === "SUPER_ADMIN" || user?.role === "STAFF";
 
   useEffect(() => {
     fetchInvitations();
@@ -99,7 +103,7 @@ const Invitations = () => {
         subtitle="Manage digital invitations"
         icon="envelope"
         actions={
-          eventIdParam && (
+          canManageInvitations && eventIdParam && (
             <Button
               icon="envelopes-bulk"
               isLoading={generatingBulk}
@@ -185,7 +189,7 @@ const Invitations = () => {
                         </span>
                       </Table.Cell>
                       <Table.Cell>
-                        {inv.status === "PENDING" && (
+                        {canManageInvitations && inv.status === "PENDING" && (
                           <button
                             onClick={() => handleSend(inv.id)}
                             className="p-1.5 rounded text-indigo-600 hover:bg-indigo-50 transition-colors"

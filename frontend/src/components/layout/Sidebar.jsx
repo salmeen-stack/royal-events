@@ -32,7 +32,13 @@ const navItems = [
         label: "Events",
         path: "/events",
         icon: "calendar-days",
-        roles: ["SUPER_ADMIN", "STAFF", "EVENT_OWNER"],
+        roles: ["SUPER_ADMIN", "STAFF"],
+      },
+      {
+        label: "My Events",
+        path: "/events",
+        icon: "calendar-days",
+        roles: ["EVENT_OWNER"],
       },
       {
         label: "Event Owners",

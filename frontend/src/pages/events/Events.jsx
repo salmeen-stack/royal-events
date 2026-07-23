@@ -17,9 +17,11 @@ import useDebounce from "../../hooks/useDebounce";
 import { formatDateShort, formatCurrency } from "../../utils/formatters";
 import { getErrorMessage } from "../../utils/helpers";
 import { EVENT_STATUS, EVENT_TYPES } from "../../config/constants";
+import useAuthStore from "../../store/authStore";
 
 const Events = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -27,6 +29,8 @@ const Events = () => {
   const [typeFilter, setTypeFilter] = useState("");
   const debouncedSearch = useDebounce(search);
   const pagination = usePagination();
+
+  const canCreateEvent = user?.role === "SUPER_ADMIN" || user?.role === "STAFF";
 
   useEffect(() => {
     fetchEvents();
@@ -62,12 +66,14 @@ const Events = () => {
         subtitle="Manage all your events"
         icon="calendar-days"
         actions={
-          <Button
-            icon="plus"
-            onClick={() => navigate("/events/create")}
-          >
-            Create Event
-          </Button>
+          canCreateEvent && (
+            <Button
+              icon="plus"
+              onClick={() => navigate("/events/create")}
+            >
+              Create Event
+            </Button>
+          )
         }
       />
 

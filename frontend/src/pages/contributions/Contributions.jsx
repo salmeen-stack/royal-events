@@ -17,8 +17,10 @@ import useDebounce from "../../hooks/useDebounce";
 import { formatCurrency, formatDateShort } from "../../utils/formatters";
 import { getErrorMessage } from "../../utils/helpers";
 import { CONTRIBUTION_STATUS } from "../../config/constants";
+import useAuthStore from "../../store/authStore";
 
 const Contributions = () => {
+  const { user } = useAuthStore();
   const [searchParams] = useSearchParams();
   const eventIdParam = searchParams.get("eventId") || "";
   const [contributions, setContributions] = useState([]);
@@ -28,6 +30,8 @@ const Contributions = () => {
   const [sendingBulk, setSendingBulk] = useState(false);
   const debouncedSearch = useDebounce(search);
   const pagination = usePagination();
+
+  const canManageContributions = user?.role === "SUPER_ADMIN" || user?.role === "STAFF";
 
   useEffect(() => {
     fetchContributions();
@@ -92,7 +96,7 @@ const Contributions = () => {
         subtitle="Track guest contributions and payments"
         icon="hand-holding-dollar"
         actions={
-          eventIdParam && (
+          canManageContributions && eventIdParam && (
             <Button
               icon="paper-plane"
               variant="primary"
@@ -168,7 +172,7 @@ const Contributions = () => {
                       </Table.Cell>
                       <Table.Cell>
                         <div className="flex items-center gap-1">
-                          {contrib.status !== "PAID" && (
+                          {canManageContributions && contrib.status !== "PAID" && (
                             <button
                               onClick={() => handleSendRequest(contrib.id)}
                               className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition-colors"

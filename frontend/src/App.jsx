@@ -56,6 +56,14 @@ const DashboardRoute = () => {
   return <Dashboard />;
 };
 
+const RoleRoute = ({ children, allowedRoles = [] }) => {
+  const { user } = useAuthStore();
+  if (!allowedRoles.includes(user?.role)) {
+    return <Navigate to="/event-owner-dashboard" replace />;
+  }
+  return children;
+};
+
 const App = () => {
   return (
     <BrowserRouter>
@@ -103,7 +111,14 @@ const App = () => {
           <Route path="dashboard" element={<DashboardRoute />} />
           <Route path="event-owner-dashboard" element={<EventOwnerDashboard />} />
           <Route path="events" element={<Events />} />
-          <Route path="events/create" element={<CreateEvent />} />
+          <Route 
+            path="events/create" 
+            element={
+              <RoleRoute allowedRoles={["SUPER_ADMIN", "STAFF"]}>
+                <CreateEvent />
+              </RoleRoute>
+            } 
+          />
           <Route path="events/:id" element={<EventDetail />} />
           <Route path="guests" element={<Guests />} />
           <Route path="guests/:id" element={<GuestDetail />} />
@@ -114,10 +129,38 @@ const App = () => {
           <Route path="reminders" element={<Reminders />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="reports" element={<Reports />} />
-          <Route path="payouts" element={<Payouts />} />
-          <Route path="event-owners" element={<EventOwners />} />
-          <Route path="users" element={<Users />} />
-          <Route path="audit" element={<AuditLogs />} />
+          <Route 
+            path="payouts" 
+            element={
+              <RoleRoute allowedRoles={["SUPER_ADMIN"]}>
+                <Payouts />
+              </RoleRoute>
+            } 
+          />
+          <Route 
+            path="event-owners" 
+            element={
+              <RoleRoute allowedRoles={["SUPER_ADMIN", "STAFF"]}>
+                <EventOwners />
+              </RoleRoute>
+            } 
+          />
+          <Route 
+            path="users" 
+            element={
+              <RoleRoute allowedRoles={["SUPER_ADMIN"]}>
+                <Users />
+              </RoleRoute>
+            } 
+          />
+          <Route 
+            path="audit" 
+            element={
+              <RoleRoute allowedRoles={["SUPER_ADMIN"]}>
+                <AuditLogs />
+              </RoleRoute>
+            } 
+          />
         </Route>
 
         {/* Catch All */}

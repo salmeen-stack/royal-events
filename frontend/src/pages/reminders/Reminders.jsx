@@ -17,8 +17,10 @@ import usePagination from "../../hooks/usePagination";
 import { formatDateTime } from "../../utils/formatters";
 import { getErrorMessage } from "../../utils/helpers";
 import { REMINDER_TYPES } from "../../config/constants";
+import useAuthStore from "../../store/authStore";
 
 const Reminders = () => {
+  const { user } = useAuthStore();
   const [reminders, setReminders] = useState([]);
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +30,8 @@ const Reminders = () => {
   const [sendingEvent, setSendingEvent] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState("");
   const pagination = usePagination();
+
+  const canManageReminders = user?.role === "SUPER_ADMIN" || user?.role === "STAFF";
 
   const [form, setForm] = useState({
     eventId: "",
@@ -128,49 +132,53 @@ const Reminders = () => {
         subtitle="Schedule and send reminders to guests"
         icon="clock"
         actions={
-          <Button icon="plus" onClick={() => setShowCreateModal(true)}>
-            Create Reminder
-          </Button>
+          canManageReminders && (
+            <Button icon="plus" onClick={() => setShowCreateModal(true)}>
+              Create Reminder
+            </Button>
+          )
         }
       />
 
       {/* Quick Send Section */}
-      <Card className="mb-6">
-        <Card.Header>
-          <Card.Title>
-            <FontAwesomeIcon icon="paper-plane" className="text-indigo-500 mr-2" />
-            Quick Send Reminders
-          </Card.Title>
-        </Card.Header>
-        <Card.Content>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1">
-              <Select
-                options={events}
-                placeholder="Select Event"
-                value={selectedEvent}
-                onChange={(e) => setSelectedEvent(e.target.value)}
-              />
+      {canManageReminders && (
+        <Card className="mb-6">
+          <Card.Header>
+            <Card.Title>
+              <FontAwesomeIcon icon="paper-plane" className="text-indigo-500 mr-2" />
+              Quick Send Reminders
+            </Card.Title>
+          </Card.Header>
+          <Card.Content>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <Select
+                  options={events}
+                  placeholder="Select Event"
+                  value={selectedEvent}
+                  onChange={(e) => setSelectedEvent(e.target.value)}
+                />
+              </div>
+              <Button
+                variant="warning"
+                icon="hand-holding-dollar"
+                isLoading={sendingContrib}
+                onClick={handleSendContributionReminders}
+              >
+                Contribution Reminders
+              </Button>
+              <Button
+                variant="primary"
+                icon="calendar-days"
+                isLoading={sendingEvent}
+                onClick={handleSendEventReminders}
+              >
+                Event Reminders
+              </Button>
             </div>
-            <Button
-              variant="warning"
-              icon="hand-holding-dollar"
-              isLoading={sendingContrib}
-              onClick={handleSendContributionReminders}
-            >
-              Contribution Reminders
-            </Button>
-            <Button
-              variant="primary"
-              icon="calendar-days"
-              isLoading={sendingEvent}
-              onClick={handleSendEventReminders}
-            >
-              Event Reminders
-            </Button>
-          </div>
-        </Card.Content>
-      </Card>
+          </Card.Content>
+        </Card>
+      )}
 
       {/* Reminders Table */}
       <Card animate={false}>

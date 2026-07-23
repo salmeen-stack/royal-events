@@ -18,9 +18,11 @@ import usePagination from "../../hooks/usePagination";
 import useDebounce from "../../hooks/useDebounce";
 import { formatCurrency } from "../../utils/formatters";
 import { getErrorMessage } from "../../utils/helpers";
+import useAuthStore from "../../store/authStore";
 
 const Guests = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") || "";
   const [guests, setGuests] = useState([]);
@@ -32,6 +34,8 @@ const Guests = () => {
   const [addLoading, setAddLoading] = useState(false);
   const debouncedSearch = useDebounce(search);
   const pagination = usePagination();
+
+  const canAddGuest = user?.role === "SUPER_ADMIN" || user?.role === "STAFF";
 
   const [guestForm, setGuestForm] = useState({
     name: "",
@@ -136,13 +140,15 @@ const Guests = () => {
         subtitle="Manage event guests"
         icon="users"
         actions={
-          <Button
-            icon="user-plus"
-            onClick={() => setShowAddModal(true)}
-            disabled={!selectedEvent}
-          >
-            Add Guest
-          </Button>
+          canAddGuest && (
+            <Button
+              icon="user-plus"
+              onClick={() => setShowAddModal(true)}
+              disabled={!selectedEvent}
+            >
+              Add Guest
+            </Button>
+          )
         }
       />
 
