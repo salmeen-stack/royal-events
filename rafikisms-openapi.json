@@ -1,0 +1,1338 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "RafikiSMS API",
+    "version": "1.0.0",
+    "description": "REST API for sending SMS, generating and verifying OTP codes, managing sender names, checking balances, retrieving delivery reports, and configuring delivery webhooks.",
+    "contact": {
+      "name": "RafikiSMS Support",
+      "url": "https://rafikisms.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.rafikisms.com",
+      "description": "Production API"
+    }
+  ],
+  "tags": [
+    {
+      "name": "SMS",
+      "description": "Send SMS messages and retrieve message logs."
+    },
+    {
+      "name": "OTP",
+      "description": "Generate and verify one-time passwords sent by SMS."
+    },
+    {
+      "name": "Sender Names",
+      "description": "Manage sender names and account balance."
+    },
+    {
+      "name": "Webhooks",
+      "description": "Configure delivery status webhooks."
+    }
+  ],
+  "paths": {
+    "/v1/vendor/send-sms": {
+      "post": {
+        "tags": [
+          "SMS"
+        ],
+        "summary": "Send single SMS",
+        "description": "Queues one SMS message for asynchronous delivery. Phone numbers must be in international format without the plus sign, for example 255712345678. If sender_id, sender, or source_address is omitted, the account default sender is used.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendSmsRequest"
+              },
+              "example": {
+                "phone": "255712345678",
+                "message": "Hello! This is a test message from RafikiSMS.",
+                "sender_id": "MYBRAND"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SMS accepted and queued for sending.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendSmsResponse"
+                },
+                "example": {
+                  "status": "success",
+                  "message": "SMS queued successfully",
+                  "data": {
+                    "message": "SMS has been queued for sending",
+                    "note": "SMS will be processed asynchronously. Check SMS logs for status updates."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/v1/vendor/send-bulk-sms": {
+      "post": {
+        "tags": [
+          "SMS"
+        ],
+        "summary": "Send bulk SMS",
+        "description": "Queues one message for multiple recipients. Use recipients as an array of phone numbers or phone as a comma-separated string. Multipart uploads can also pass recipients_file in the dashboard flow.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendBulkSmsRequest"
+              },
+              "example": {
+                "message": "Your bulk message content (max 160 characters)",
+                "phone": "255712345678,255621728109,255620656604",
+                "sender_id": "MYBRAND"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk SMS accepted and queued for sending.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendBulkSmsResponse"
+                },
+                "example": {
+                  "status": "success",
+                  "message": "Bulk SMS queued successfully",
+                  "data": {
+                    "message": "Bulk SMS has been queued for sending",
+                    "total_recipients": 3,
+                    "note": "SMS will be processed asynchronously."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/v1/sms-logs": {
+      "get": {
+        "tags": [
+          "SMS"
+        ],
+        "summary": "Get SMS logs",
+        "description": "Returns paginated SMS logs for the authenticated user.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PerPage"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated SMS logs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsLogsResponse"
+                },
+                "example": {
+                  "status": "success",
+                  "message": "SMS logs retrieved successfully",
+                  "data": {
+                    "current_page": 1,
+                    "data": [
+                      {
+                        "id": 15,
+                        "user_id": 4,
+                        "recipient": "255712345678",
+                        "message": "Hello! This is a test message",
+                        "status": "success",
+                        "transaction_id": "19725260",
+                        "created_at": "2025-12-11T13:10:15.000000Z",
+                        "updated_at": "2025-12-11T13:10:17.000000Z"
+                      }
+                    ],
+                    "per_page": 10,
+                    "total": 15,
+                    "last_page": 2
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/otp/generate": {
+      "post": {
+        "tags": [
+          "OTP"
+        ],
+        "summary": "Generate OTP",
+        "description": "Sends a one-time password to a phone number. The OTP code is never returned in the API response. Use the returned reference_id when verifying the user-entered code. Rate limit: 3 generate calls per phone number per 5 minutes. If sender_id is omitted, the SMS will be sent using the RafikiSMS default company sender name instead of your brand.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateOtpRequest"
+              },
+              "example": {
+                "phone_number": "255712345678",
+                "sender_id": "MYSHOP-OTP"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateOtpResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "OTP sent successfully.",
+                  "data": {
+                    "reference_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "expires_in_seconds": 300
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/otp/verify": {
+      "post": {
+        "tags": [
+          "OTP"
+        ],
+        "summary": "Verify OTP",
+        "description": "Verifies the 6-digit code received by SMS. This public endpoint does not require an API key. Each reference_id allows a maximum of 5 wrong attempts before it is locked.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              },
+              "example": {
+                "phone_number": "255712345678",
+                "otp_code": "482916",
+                "reference_id": "550e8400-e29b-41d4-a716-446655440000"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP verified.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyOtpResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Verification successful.",
+                  "data": {
+                    "verified": true
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "description": "Maximum verification attempts exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtpErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "message": "Too many attempts.",
+                  "error_code": "ATTEMPTS_EXCEEDED"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vendor/sender-names": {
+      "get": {
+        "tags": [
+          "Sender Names"
+        ],
+        "summary": "Get sender names",
+        "description": "Retrieves sender names associated with the API key account.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/PerPage"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Optional sender-name status filter, for example active or pending.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sender names for the account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SenderNamesResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Sender names retrieved successfully",
+                  "data": {
+                    "sender_names": [
+                      {
+                        "id": "c893d701-e1d8-4b00-8634-8c464e56ba11",
+                        "senderid": "STARSHINE",
+                        "sample_content": "This sender name is used for order confirmations",
+                        "status": "active",
+                        "created": "2025-07-08T14:07:56.000Z"
+                      }
+                    ],
+                    "pagination": {
+                      "totalItems": 1,
+                      "currentPage": 1,
+                      "pageSize": 25,
+                      "totalPages": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/vendor/balance": {
+      "get": {
+        "tags": [
+          "Sender Names"
+        ],
+        "summary": "Check balance",
+        "description": "Returns the current SMS credit balance for the API key account.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current SMS credit balance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceResponse"
+                },
+                "example": {
+                  "status": "success",
+                  "message": "Balance retrieved successfully",
+                  "data": {
+                    "credit_balance": 1000
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/vendor/delivery-reports": {
+      "get": {
+        "tags": [
+          "Sender Names"
+        ],
+        "summary": "Get delivery report",
+        "description": "Checks delivery status for a sent SMS. Query at least 5 minutes after sending to allow for network delays. Status values include DELIVERED, PENDING, and UNDELIVERED.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dest_addr",
+            "in": "query",
+            "required": true,
+            "description": "Destination phone number in international format.",
+            "schema": {
+              "type": "string",
+              "example": "255712345678"
+            }
+          },
+          {
+            "name": "request_id",
+            "in": "query",
+            "required": true,
+            "description": "SMS request or transaction ID returned by the send endpoint.",
+            "schema": {
+              "type": "string",
+              "example": "19725260"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delivery report for the message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryReportsResponse"
+                },
+                "example": {
+                  "status": "success",
+                  "message": "Delivery report retrieved successfully",
+                  "data": {
+                    "delivery_reports": [
+                      {
+                        "dest_addr": "255712345678",
+                        "status": "DELIVERED",
+                        "request_id": "19725260"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/v1/sender-names/request": {
+      "post": {
+        "tags": [
+          "Sender Names"
+        ],
+        "summary": "Request sender name",
+        "description": "Requests a new sender name. The sender ID must be 11 characters or fewer and can contain letters, numbers, spaces, hyphens, and dots.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestSenderNameRequest"
+              },
+              "example": {
+                "senderid": "STARSHINE",
+                "sample_content": "This sender name will be used for sending order confirmations and delivery notifications to our customers"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sender name request created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestSenderNameResponse"
+                },
+                "example": {
+                  "status": "success",
+                  "message": "Sender name requested successfully",
+                  "data": {
+                    "id": "24e1ffaf-e399-4b15-983a-53539e4970bd",
+                    "senderid": "STARSHINE",
+                    "sample_content": "This sender name will be used for sending order confirmations",
+                    "status": "pending"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/v1/vendors/delivery-webhook": {
+      "put": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Configure delivery webhook",
+        "description": "Sets or disables the HTTPS URL that receives SMS delivery status events. Only the parent vendor account can set this URL; sub-accounts inherit it. Pass null to disable.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryWebhookRequest"
+              },
+              "example": {
+                "delivery_webhook_url": "https://yourapp.com/webhooks/sms"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook URL saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryWebhookResponse"
+                },
+                "example": {
+                  "status": "success",
+                  "message": "Delivery webhook updated successfully",
+                  "data": {
+                    "delivery_webhook_url": "https://yourapp.com/webhooks/sms"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Vendor API key generated from Profile > Integration."
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Dashboard access token for account-authenticated endpoints."
+      }
+    },
+    "parameters": {
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "description": "Page number. Defaults to 1.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "PerPage": {
+        "name": "per_page",
+        "in": "query",
+        "required": false,
+        "description": "Items per page. Defaults to 10, maximum 100.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Authentication failed or credentials are missing.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "status": "error",
+              "message": "Unauthenticated."
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Request validation failed.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "example": {
+              "status": "error",
+              "message": "Validation failed",
+              "errors": {
+                "phone": [
+                  "The phone field is required."
+                ],
+                "message": [
+                  "The message must not exceed 160 characters."
+                ]
+              }
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Too many requests.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "status": "error",
+              "message": "Too Many Requests"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "error"
+          },
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": "string"
+          }
+        }
+      },
+      "ValidationErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "error"
+          },
+          "message": {
+            "type": "string",
+            "example": "Validation failed"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "SendSmsRequest": {
+        "type": "object",
+        "required": [
+          "phone",
+          "message"
+        ],
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "255712345678"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "sender_id": {
+            "type": "string",
+            "maxLength": 11,
+            "description": "Approved sender name."
+          },
+          "sender": {
+            "type": "string",
+            "maxLength": 11
+          },
+          "source_address": {
+            "type": "string",
+            "maxLength": 11
+          }
+        }
+      },
+      "SendSmsResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "SendBulkSmsRequest": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "phone": {
+            "type": "string",
+            "description": "Comma-separated recipient phone numbers.",
+            "example": "255712345678,255621728109"
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Recipient phone numbers."
+          },
+          "sender_id": {
+            "type": "string",
+            "maxLength": 11
+          },
+          "sender": {
+            "type": "string",
+            "maxLength": 11
+          },
+          "source_address": {
+            "type": "string",
+            "maxLength": 11
+          }
+        }
+      },
+      "SendBulkSmsResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "total_recipients": {
+                "type": "integer"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "SmsLog": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "user_id": {
+            "type": "integer"
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "transaction_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SmsLogsResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "current_page": {
+                "type": "integer"
+              },
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SmsLog"
+                }
+              },
+              "per_page": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              },
+              "last_page": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "GenerateOtpRequest": {
+        "type": "object",
+        "required": [
+          "phone_number"
+        ],
+        "properties": {
+          "phone_number": {
+            "type": "string",
+            "example": "255712345678"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Alias for phone_number."
+          },
+          "sender_id": {
+            "type": "string",
+            "maxLength": 11
+          }
+        }
+      },
+      "GenerateOtpResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "reference_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "expires_in_seconds": {
+                "type": "integer",
+                "example": 300
+              }
+            }
+          }
+        }
+      },
+      "VerifyOtpRequest": {
+        "type": "object",
+        "required": [
+          "phone_number",
+          "otp_code",
+          "reference_id"
+        ],
+        "properties": {
+          "phone_number": {
+            "type": "string",
+            "example": "255712345678"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Alias for phone_number."
+          },
+          "otp_code": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 6,
+            "example": "482916"
+          },
+          "code": {
+            "type": "string",
+            "description": "Alias for otp_code."
+          },
+          "otp": {
+            "type": "string",
+            "description": "Alias for otp_code."
+          },
+          "reference_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "referenceId": {
+            "type": "string",
+            "description": "Alias for reference_id."
+          },
+          "ref_id": {
+            "type": "string",
+            "description": "Alias for reference_id."
+          }
+        }
+      },
+      "VerifyOtpResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "verified": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "OtpErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": "string",
+            "enum": [
+              "INVALID_REFERENCE",
+              "CODE_ALREADY_USED",
+              "CODE_EXPIRED",
+              "INVALID_CODE",
+              "ATTEMPTS_EXCEEDED",
+              "OTP_RATE_LIMIT_EXCEEDED"
+            ]
+          },
+          "attempts_remaining": {
+            "type": "integer"
+          }
+        }
+      },
+      "SenderName": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "senderid": {
+            "type": "string"
+          },
+          "sample_content": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "pending",
+              "rejected"
+            ]
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SenderNamesResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "sender_names": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SenderName"
+                }
+              },
+              "pagination": {
+                "$ref": "#/components/schemas/PaginationMeta"
+              }
+            }
+          }
+        }
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "totalItems": {
+            "type": "integer"
+          },
+          "currentPage": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          }
+        }
+      },
+      "BalanceResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "credit_balance": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "DeliveryReport": {
+        "type": "object",
+        "properties": {
+          "dest_addr": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DELIVERED",
+              "PENDING",
+              "UNDELIVERED"
+            ]
+          },
+          "request_id": {
+            "type": "string"
+          }
+        }
+      },
+      "DeliveryReportsResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "delivery_reports": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DeliveryReport"
+                }
+              }
+            }
+          }
+        }
+      },
+      "RequestSenderNameRequest": {
+        "type": "object",
+        "required": [
+          "senderid",
+          "sample_content"
+        ],
+        "properties": {
+          "senderid": {
+            "type": "string",
+            "maxLength": 11,
+            "pattern": "^[A-Za-z0-9 .-]+$"
+          },
+          "sample_content": {
+            "type": "string",
+            "minLength": 15
+          }
+        }
+      },
+      "RequestSenderNameResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SenderName"
+          }
+        }
+      },
+      "DeliveryWebhookRequest": {
+        "type": "object",
+        "required": [
+          "delivery_webhook_url"
+        ],
+        "properties": {
+          "delivery_webhook_url": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true,
+            "description": "HTTPS endpoint URL. Set to null to disable."
+          }
+        }
+      },
+      "DeliveryWebhookResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "delivery_webhook_url": {
+                "type": "string",
+                "format": "uri",
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "WebhookDeliveryPayload": {
+        "type": "object",
+        "description": "Payload sent by RafikiSMS to the configured delivery webhook URL.",
+        "properties": {
+          "event": {
+            "type": "string",
+            "example": "sms.delivery_status"
+          },
+          "event_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "vendor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "uuid": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              }
+            }
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "sms_log_id": {
+                "type": "integer"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "delivered",
+                  "pending",
+                  "failed",
+                  "undelivered"
+                ]
+              },
+              "recipient": {
+                "type": "string"
+              },
+              "sender_id": {
+                "type": "string"
+              },
+              "transaction_id": {
+                "type": "string"
+              },
+              "message_id": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "delivered_at": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "failure_reason": {
+                "type": "string",
+                "nullable": true
+              },
+              "source_addr": {
+                "type": "string"
+              },
+              "dest_addr": {
+                "type": "string"
+              },
+              "processing_time_ms": {
+                "type": "integer"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

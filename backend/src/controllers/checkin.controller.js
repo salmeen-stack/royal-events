@@ -1,6 +1,7 @@
   
 import prisma from "../config/prisma.js";
 import { successResponse, errorResponse, paginatedResponse } from "../utils/response.js";
+import { generateOTP, verifyOTP } from "../services/sms.service.js";
 
 // ==========================================
 // GET ALL CHECKINS
@@ -589,5 +590,183 @@ export const getEventCheckInStats = async (req, res) => {
   } catch (error) {
     console.error("Get event check-in stats error:", error);
     return errorResponse(res, "Failed to retrieve check-in stats.", 500);
+  }
+};
+
+// ==========================================
+// REQUEST OTP FOR CHECK-IN
+// ==========================================
+
+export const requestOTPForCheckIn = async (req, res) => {
+  try {
+    const { phone, eventId } = req.body;
+
+    if (!phone || !eventId) {
+      return errorResponse(res, "Phone number and Event ID are required.");
+    }
+
+    // Validate phone number format
+    const formattedPhone = phone.replace(/^\+/, "");
+
+    // Find guest by phone and event
+    const guest = await prisma.guest.findFirst({
+      where: {
+        phone: { contains: formattedPhone, mode: "insensitive" },
+        eventId,
+      },
+      include: {
+        invitations: {
+          where: { eventId },
+          include: { checkIn: true },
+        },
+        event: true,
+      },
+    });
+
+    if (!guest) {
+      return errorResponse(res, "Guest not found for this phone number and event.", 404);
+    }
+
+    // Check if guest has an invitation
+    if (guest.invitations.length === 0) {
+      return errorResponse(res, "No invitation found for this guest.", 404);
+    }
+
+    // Check if already checked in
+    const existingCheckIn = guest.invitations.find(inv => inv.checkIn);
+    if (existingCheckIn) {
+      return errorResponse(res, "Guest has already been checked in.", 409);
+    }
+
+    // Generate OTP via RafikiSMS
+    const otpResult = await generateOTP(formattedPhone);
+
+    if (!otpResult.success) {
+      return errorResponse(res, "Failed to generate OTP. Please try again.", 500);
+    }
+
+    // Store reference ID in session or temporary storage (for now, return it)
+    // In production, you might want to store this in Redis or database with expiration
+    return successResponse(res, "OTP sent successfully.", {
+      referenceId: otpResult.referenceId,
+      expiresIn: otpResult.expiresIn,
+      guest: {
+        id: guest.id,
+        name: guest.name,
+        phone: guest.phone,
+      },
+    });
+
+  } catch (error) {
+    console.error("Request OTP for check-in error:", error);
+    return errorResponse(res, "Failed to request OTP.", 500);
+  }
+};
+
+// ==========================================
+// VERIFY OTP AND CHECK-IN
+// ==========================================
+
+export const verifyOTPAndCheckIn = async (req, res) => {
+  try {
+    const { phone, otpCode, referenceId, eventId, notes } = req.body;
+
+    if (!phone || !otpCode || !referenceId || !eventId) {
+      return errorResponse(res, "Phone, OTP code, reference ID, and Event ID are required.");
+    }
+
+    // Validate phone number format
+    const formattedPhone = phone.replace(/^\+/, "");
+
+    // Verify OTP via RafikiSMS
+    const verifyResult = await verifyOTP(formattedPhone, otpCode, referenceId);
+
+    if (!verifyResult.success || !verifyResult.verified) {
+      return errorResponse(res, verifyResult.message || "Invalid OTP code.", 400, {
+        errorCode: verifyResult.errorCode,
+      });
+    }
+
+    // Find guest by phone and event
+    const guest = await prisma.guest.findFirst({
+      where: {
+        phone: { contains: formattedPhone, mode: "insensitive" },
+        eventId,
+      },
+      include: {
+        invitations: {
+          where: { eventId },
+          include: { checkIn: true },
+        },
+        event: true,
+      },
+    });
+
+    if (!guest) {
+      return errorResponse(res, "Guest not found.", 404);
+    }
+
+    // Get invitation
+    const invitation = guest.invitations[0];
+    if (!invitation) {
+      return errorResponse(res, "No invitation found for this guest.", 404);
+    }
+
+    // Check if already checked in
+    if (invitation.checkIn) {
+      return errorResponse(res, "Guest has already been checked in.", 409, {
+        alreadyCheckedIn: true,
+        checkInDetails: {
+          checkedInAt: invitation.checkIn.checkedInAt,
+          method: invitation.checkIn.method,
+        },
+      });
+    }
+
+    // Create check-in record
+    const checkIn = await prisma.checkIn.create({
+      data: {
+        method: "OTP",
+        notes: notes || null,
+        eventId,
+        guestId: guest.id,
+        invitationId: invitation.id,
+        staffId: req.user.id,
+      },
+      include: {
+        guest: {
+          select: { id: true, name: true, phone: true },
+        },
+        staff: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    // Update invitation status
+    await prisma.invitation.update({
+      where: { id: invitation.id },
+      data: { status: "DELIVERED", deliveredAt: new Date() },
+    });
+
+    return successResponse(res, "Guest checked in successfully via OTP.", {
+      checkIn: {
+        id: checkIn.id,
+        method: checkIn.method,
+        checkedInAt: checkIn.checkedInAt,
+      },
+      guest: {
+        id: guest.id,
+        name: guest.name,
+        phone: guest.phone,
+        category: guest.category,
+      },
+      event: guest.event,
+      checkedInBy: checkIn.staff.name,
+    });
+
+  } catch (error) {
+    console.error("Verify OTP and check-in error:", error);
+    return errorResponse(res, "Failed to verify OTP and check in.", 500);
   }
 };

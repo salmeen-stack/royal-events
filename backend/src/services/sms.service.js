@@ -5,18 +5,25 @@ import prisma from "../config/prisma.js";
 
 dotenv.config();
 
+const RAFIKI_BASE_URL = process.env.RAFIKI_BASE_URL || "https://api.rafikisms.com";
+const RAFIKI_API_KEY = process.env.RAFIKI_API_KEY;
+const RAFIKI_SENDER_ID = process.env.RAFIKI_SENDER_ID;
+
 // ==========================================
 // SEND SINGLE SMS
 // ==========================================
 
 export const sendSMS = async ({ to, message, eventId = null, guestId = null, type = "SMS" }) => {
   try {
+    // Validate phone number format (should be international without +)
+    const phone = to.replace(/^\+/, "");
+    
     // Create notification record first
     const notification = await prisma.notification.create({
       data: {
         type,
         channel: "SMS",
-        recipient: to,
+        recipient: phone,
         message,
         status: "PENDING",
         eventId,
@@ -24,19 +31,19 @@ export const sendSMS = async ({ to, message, eventId = null, guestId = null, typ
       },
     });
 
-    // Send via Rafiki SMS API
+    // Send via Rafiki SMS API (v1/vendor/send-sms)
     const response = await axios.post(
-      `${process.env.RAFIKI_BASE_URL}/send`,
+      `${RAFIKI_BASE_URL}/v1/vendor/send-sms`,
       {
-        api_key: process.env.RAFIKI_API_KEY,
-        sender_id: process.env.RAFIKI_SENDER_ID,
-        to,
+        phone,
         message,
+        sender_id: RAFIKI_SENDER_ID,
       },
       {
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json",
+          "Accept": "application/json",
+          "X-API-Key": RAFIKI_API_KEY,
         },
         timeout: 15000,
       }
@@ -47,7 +54,7 @@ export const sendSMS = async ({ to, message, eventId = null, guestId = null, typ
       where: { id: notification.id },
       data: {
         status: "SENT",
-        providerRef: response.data?.messageId || response.data?.id || null,
+        providerRef: response.data?.data?.message || null,
         sentAt: new Date(),
       },
     });
@@ -55,7 +62,7 @@ export const sendSMS = async ({ to, message, eventId = null, guestId = null, typ
     return {
       success: true,
       notificationId: notification.id,
-      providerRef: response.data?.messageId || null,
+      providerRef: response.data?.data?.message || null,
     };
 
   } catch (error) {
@@ -65,7 +72,7 @@ export const sendSMS = async ({ to, message, eventId = null, guestId = null, typ
     try {
       await prisma.notification.updateMany({
         where: {
-          recipient: to,
+          recipient: to.replace(/^\+/, ""),
           status: "PENDING",
           channel: "SMS",
         },
@@ -89,30 +96,86 @@ export const sendSMS = async ({ to, message, eventId = null, guestId = null, typ
 // SEND BULK SMS
 // ==========================================
 
-export const sendBulkSMS = async (messages) => {
-  const results = {
-    success: 0,
-    failed: 0,
-    errors: [],
-  };
+export const sendBulkSMS = async ({ phones, message, eventId = null, type = "BULK_SMS" }) => {
+  try {
+    // Validate and format phone numbers
+    const formattedPhones = phones.map(phone => phone.replace(/^\+/, ""));
+    
+    // Create notification records for all recipients
+    const notifications = await prisma.notification.createMany({
+      data: formattedPhones.map(phone => ({
+        type,
+        channel: "SMS",
+        recipient: phone,
+        message,
+        status: "PENDING",
+        eventId,
+      })),
+    });
 
-  for (const msg of messages) {
-    const result = await sendSMS(msg);
-    if (result.success) {
-      results.success++;
-    } else {
-      results.failed++;
-      results.errors.push({
-        to: msg.to,
-        error: result.error,
+    // Send via Rafiki SMS API (v1/vendor/send-bulk-sms)
+    const response = await axios.post(
+      `${RAFIKI_BASE_URL}/v1/vendor/send-bulk-sms`,
+      {
+        phone: formattedPhones.join(","),
+        message,
+        sender_id: RAFIKI_SENDER_ID,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-API-Key": RAFIKI_API_KEY,
+        },
+        timeout: 30000,
+      }
+    );
+
+    // Update all notifications as sent
+    await prisma.notification.updateMany({
+      where: {
+        recipient: { in: formattedPhones },
+        status: "PENDING",
+        channel: "SMS",
+      },
+      data: {
+        status: "SENT",
+        sentAt: new Date(),
+      },
+    });
+
+    return {
+      success: true,
+      totalRecipients: formattedPhones.length,
+      message: response.data?.data?.message || "Bulk SMS queued successfully",
+    };
+
+  } catch (error) {
+    console.error("Send bulk SMS error:", error.message);
+
+    // Update notifications as failed
+    try {
+      const formattedPhones = phones.map(phone => phone.replace(/^\+/, ""));
+      await prisma.notification.updateMany({
+        where: {
+          recipient: { in: formattedPhones },
+          status: "PENDING",
+          channel: "SMS",
+        },
+        data: {
+          status: "FAILED",
+          failureReason: error.message,
+        },
       });
+    } catch (dbError) {
+      console.error("Failed to update notification status:", dbError.message);
     }
 
-    // Small delay to avoid rate limiting
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    return {
+      success: false,
+      error: error.message,
+    };
   }
-
-  return results;
 };
 
 // ==========================================
@@ -251,4 +314,156 @@ export const sendEventReminderSMS = async ({ guest, event, daysUntilEvent }) => 
     guestId: guest.id,
     type: "EVENT_REMINDER",
   });
+};
+
+// ==========================================
+// GENERATE OTP FOR CHECK-IN
+// ==========================================
+
+export const generateOTP = async (phone) => {
+  try {
+    // Validate phone number format
+    const formattedPhone = phone.replace(/^\+/, "");
+    
+    // Generate OTP via Rafiki SMS API (v1/otp/generate)
+    const response = await axios.post(
+      `${RAFIKI_BASE_URL}/v1/otp/generate`,
+      {
+        phone_number: formattedPhone,
+        sender_id: RAFIKI_SENDER_ID,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-API-Key": RAFIKI_API_KEY,
+        },
+        timeout: 15000,
+      }
+    );
+
+    return {
+      success: true,
+      referenceId: response.data?.data?.reference_id,
+      expiresIn: response.data?.data?.expires_in_seconds || 300,
+    };
+
+  } catch (error) {
+    console.error("Generate OTP error:", error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+// ==========================================
+// VERIFY OTP FOR CHECK-IN
+// ==========================================
+
+export const verifyOTP = async (phone, otpCode, referenceId) => {
+  try {
+    // Validate phone number format
+    const formattedPhone = phone.replace(/^\+/, "");
+    
+    // Verify OTP via Rafiki SMS API (v1/otp/verify)
+    const response = await axios.post(
+      `${RAFIKI_BASE_URL}/v1/otp/verify`,
+      {
+        phone_number: formattedPhone,
+        otp_code: otpCode,
+        reference_id: referenceId,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        timeout: 15000,
+      }
+    );
+
+    return {
+      success: true,
+      verified: response.data?.data?.verified || false,
+      message: response.data?.message || "Verification successful",
+    };
+
+  } catch (error) {
+    console.error("Verify OTP error:", error.message);
+    return {
+      success: false,
+      verified: false,
+      error: error.message,
+      errorCode: error.response?.data?.error_code || null,
+    };
+  }
+};
+
+// ==========================================
+// CHECK SMS BALANCE
+// ==========================================
+
+export const checkBalance = async () => {
+  try {
+    const response = await axios.get(
+      `${RAFIKI_BASE_URL}/v1/vendor/balance`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-API-Key": RAFIKI_API_KEY,
+        },
+        timeout: 10000,
+      }
+    );
+
+    return {
+      success: true,
+      creditBalance: response.data?.data?.credit_balance || 0,
+    };
+
+  } catch (error) {
+    console.error("Check balance error:", error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+// ==========================================
+// GET DELIVERY REPORT
+// ==========================================
+
+export const getDeliveryReport = async (destAddr, requestId) => {
+  try {
+    const response = await axios.get(
+      `${RAFIKI_BASE_URL}/v1/vendor/delivery-reports`,
+      {
+        params: {
+          dest_addr: destAddr,
+          request_id: requestId,
+        },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-API-Key": RAFIKI_API_KEY,
+        },
+        timeout: 10000,
+      }
+    );
+
+    return {
+      success: true,
+      deliveryReports: response.data?.data?.delivery_reports || [],
+    };
+
+  } catch (error) {
+    console.error("Get delivery report error:", error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
 };

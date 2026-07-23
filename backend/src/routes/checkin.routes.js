@@ -9,6 +9,8 @@ import {
   checkInBySMSToken,
   manualCheckIn,
   getEventCheckInStats,
+  requestOTPForCheckIn,
+  verifyOTPAndCheckIn,
 } from "../controllers/checkin.controller.js";
 import { authenticate, isStaff, isEventOwner } from "../middleware/auth.js";
 
@@ -25,5 +27,7 @@ router.post("/verify/token", verifySMSToken);
 router.post("/qr", checkInByQR);
 router.post("/token", checkInBySMSToken);
 router.post("/manual", manualCheckIn);
+router.post("/otp/request", requestOTPForCheckIn);
+router.post("/otp/verify", verifyOTPAndCheckIn);
 
 export default router;

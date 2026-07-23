@@ -1,7 +1,7 @@
   
 import prisma from "../config/prisma.js";
 import { successResponse, errorResponse, paginatedResponse } from "../utils/response.js";
-import { sendContributionReminderSMS, sendEventReminderSMS } from "../services/sms.service.js";
+import { sendContributionReminderSMS, sendEventReminderSMS, sendBulkSMS } from "../services/sms.service.js";
 import { sendWhatsAppEventReminder } from "../services/whatsapp.service.js";
 
 // ==========================================
