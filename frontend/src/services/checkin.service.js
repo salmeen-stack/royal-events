@@ -11,6 +11,16 @@ const checkinService = {
     return response.data;
   },
 
+  verifyQR: async (qrToken) => {
+    const response = await api.post("/checkins/verify/qr", { qrToken });
+    return response.data;
+  },
+
+  verifyToken: async (smsToken) => {
+    const response = await api.post("/checkins/verify/token", { smsToken });
+    return response.data;
+  },
+
   checkInByQR: async (qrToken, notes = "") => {
     const response = await api.post("/checkins/qr", { qrToken, notes });
     return response.data;

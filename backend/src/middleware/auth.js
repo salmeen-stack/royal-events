@@ -38,6 +38,42 @@ export const authenticate = async (req, res, next) => {
       return errorResponse(res, "Account is deactivated.", 401);
     }
 
+    // Check if event owner access should be revoked (7 days after event)
+    if (user.role === "EVENT_OWNER") {
+      const eventOwner = await prisma.eventOwner.findUnique({
+        where: { email: user.email },
+        include: {
+          events: {
+            select: {
+              eventDate: true,
+              status: true,
+            },
+          },
+        },
+      });
+
+      if (eventOwner && eventOwner.events.length > 0) {
+        const now = new Date();
+        const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
+        
+        // Check if all events are completed and 7 days have passed
+        const allEventsExpired = eventOwner.events.every(event => {
+          const eventDate = new Date(event.eventDate);
+          const daysSinceEvent = now - eventDate;
+          return daysSinceEvent > sevenDaysInMs;
+        });
+
+        if (allEventsExpired) {
+          // Deactivate the user account
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { isActive: false },
+          });
+          return errorResponse(res, "Your access has been revoked as all your events have concluded.", 401);
+        }
+      }
+    }
+
     req.user = user;
     next();
 

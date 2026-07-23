@@ -17,10 +17,11 @@ const CheckIn = () => {
   const [mode, setMode] = useState("token");
   const [tokenInput, setTokenInput] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [result, setResult] = useState(null);
+  const [guestPreview, setGuestPreview] = useState(null);
   const [error, setError] = useState("");
   const [scannerReady, setScannerReady] = useState(false);
-  const [scannerError, setScannerError] = useState("");
   const tokenRef = useRef(null);
   const qrScannerRef = useRef(null);
   const qrRegionId = "qr-reader-region";
@@ -35,7 +36,6 @@ const CheckIn = () => {
         qrScannerRef.current.clear().catch(() => {});
       }
       setScannerReady(false);
-      setScannerError("");
       return;
     }
 
@@ -47,6 +47,7 @@ const CheckIn = () => {
         qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
         disableFlip: false,
+        facingMode: "environment",
       },
       false
     );
@@ -58,17 +59,13 @@ const CheckIn = () => {
         if (cancelled) return;
         const token = extractTokenFromQRValue(decodedText);
         if (!token) {
-          setScannerError("The scanned QR code did not contain a usable token.");
           return;
         }
         await scanner.clear().catch(() => {});
         await handleQRCheckIn(token);
       },
-      (error) => {
-        if (cancelled) return;
-        if (error && typeof error === "string") {
-          setScannerError(error);
-        }
+      () => {
+        // Silently ignore scanning errors
       }
     );
 
@@ -91,28 +88,23 @@ const CheckIn = () => {
 
     setIsVerifying(true);
     setResult(null);
+    setGuestPreview(null);
     setError("");
 
     try {
-      const response = await checkinService.checkInByToken(tokenInput.trim());
+      const response = await checkinService.verifyToken(tokenInput.trim());
       if (response.success) {
-        setResult({
-          type: "success",
-          data: response.data,
-          message: response.message,
-        });
+        setGuestPreview(response.data);
+        if (response.data.alreadyCheckedIn) {
+          setResult({
+            type: "already",
+            data: response.data,
+            message: "ALREADY CHECKED IN",
+          });
+        }
       }
     } catch (err) {
-      const errorData = err.response?.data;
-      if (errorData?.errors?.alreadyCheckedIn) {
-        setResult({
-          type: "already",
-          data: errorData.errors,
-          message: "ALREADY CHECKED IN",
-        });
-      } else {
-        setError(getErrorMessage(err));
-      }
+      setError(getErrorMessage(err));
     } finally {
       setIsVerifying(false);
     }
@@ -127,29 +119,23 @@ const CheckIn = () => {
 
     setIsVerifying(true);
     setResult(null);
+    setGuestPreview(null);
     setError("");
-    setScannerError("");
 
     try {
-      const response = await checkinService.checkInByQR(token);
+      const response = await checkinService.verifyQR(token);
       if (response.success) {
-        setResult({
-          type: "success",
-          data: response.data,
-          message: response.message,
-        });
+        setGuestPreview(response.data);
+        if (response.data.alreadyCheckedIn) {
+          setResult({
+            type: "already",
+            data: response.data,
+            message: "ALREADY CHECKED IN",
+          });
+        }
       }
     } catch (err) {
-      const errorData = err.response?.data;
-      if (errorData?.errors?.alreadyCheckedIn) {
-        setResult({
-          type: "already",
-          data: errorData.errors,
-          message: "ALREADY CHECKED IN",
-        });
-      } else {
-        setError(getErrorMessage(err));
-      }
+      setError(getErrorMessage(err));
     } finally {
       setIsVerifying(false);
       setScannerReady(false);
@@ -159,8 +145,35 @@ const CheckIn = () => {
   const handleReset = () => {
     setTokenInput("");
     setResult(null);
+    setGuestPreview(null);
     setError("");
     if (tokenRef.current) tokenRef.current.focus();
+  };
+
+  const handleConfirmCheckIn = async () => {
+    if (!guestPreview) return;
+
+    setIsCheckingIn(true);
+    setError("");
+
+    try {
+      const response = mode === "qr" 
+        ? await checkinService.checkInByQR(guestPreview.invitation.qrToken)
+        : await checkinService.checkInByToken(guestPreview.invitation.smsToken);
+      
+      if (response.success) {
+        setResult({
+          type: "success",
+          data: response.data,
+          message: response.message,
+        });
+        setGuestPreview(null);
+      }
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsCheckingIn(false);
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -170,44 +183,47 @@ const CheckIn = () => {
   };
 
   return (
-    <div>
+    <div className="min-h-screen bg-gray-50 pb-safe">
       <PageHeader
         title="Guest Check-In"
         subtitle="Verify and check in guests at the event"
         icon="qrcode"
+        className="px-4 pt-4 pb-2"
       />
 
       {/* Mode Selector */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-4 px-4">
         <button
           onClick={() => { setMode("token"); handleReset(); }}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
             mode === "token"
-              ? "bg-indigo-600 text-white"
+              ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200"
               : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
           }`}
         >
           <FontAwesomeIcon icon="keyboard" />
-          SMS Token
+          <span className="hidden sm:inline">SMS Token</span>
+          <span className="sm:hidden">Token</span>
         </button>
         <button
           onClick={() => { setMode("qr"); handleReset(); }}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
             mode === "qr"
-              ? "bg-indigo-600 text-white"
+              ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200"
               : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
           }`}
         >
           <FontAwesomeIcon icon="qrcode" />
-          QR Scan
+          <span className="hidden sm:inline">QR Scan</span>
+          <span className="sm:hidden">Scan</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="px-4 space-y-4">
         {/* Input Section */}
-        <Card>
+        <Card className="shadow-sm">
           <Card.Header>
-            <Card.Title>
+            <Card.Title className="text-lg">
               <FontAwesomeIcon
                 icon={mode === "token" ? "keyboard" : "qrcode"}
                 className="text-indigo-500 mr-2"
@@ -225,42 +241,59 @@ const CheckIn = () => {
                   onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
                   onKeyPress={handleKeyPress}
                   icon="ticket"
-                  className="text-center font-mono text-lg tracking-wider"
+                  className="text-center font-mono text-xl tracking-wider py-4"
                 />
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   <Button
                     fullWidth
                     icon="magnifying-glass"
                     isLoading={isVerifying}
                     onClick={handleTokenVerify}
+                    className="py-4 text-base"
                   >
-                    Verify Token
+                    Verify Guest
                   </Button>
-                  <Button variant="secondary" icon="rotate-right" onClick={handleReset}>
+                  <Button 
+                    variant="secondary" 
+                    icon="rotate-right" 
+                    onClick={handleReset}
+                    className="px-6"
+                  >
                     Reset
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-2">
-                  <div id={qrRegionId} className="min-h-[280px] rounded-xl bg-black/90" />
+                <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-2 overflow-hidden">
+                  <div 
+                    id={qrRegionId} 
+                    className="min-h-[300px] sm:min-h-[350px] rounded-xl bg-black/90 relative"
+                  />
+                  {!scannerReady && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 rounded-xl">
+                      <div className="text-center text-white">
+                        <FontAwesomeIcon icon="camera" className="text-4xl mb-3 opacity-50" />
+                        <p className="text-sm opacity-70">Initializing camera...</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {scannerReady && (
-                  <p className="text-center text-sm text-gray-500">
-                    Point the camera at the guest’s QR code.
+                  <p className="text-center text-sm text-gray-600 bg-indigo-50 py-2 px-4 rounded-lg">
+                    <FontAwesomeIcon icon="lightbulb" className="text-indigo-500 mr-2" />
+                    Point camera at guest's QR code
                   </p>
                 )}
 
-                {scannerError && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-                    {scannerError}
-                  </div>
-                )}
-
                 <div className="flex justify-center">
-                  <Button variant="secondary" icon="rotate-right" onClick={handleReset}>
+                  <Button 
+                    variant="secondary" 
+                    icon="rotate-right" 
+                    onClick={handleReset}
+                    className="px-6 py-3"
+                  >
                     Stop Scanner
                   </Button>
                 </div>
@@ -282,6 +315,103 @@ const CheckIn = () => {
           </Card.Content>
         </Card>
 
+        {/* Guest Preview Section */}
+        <AnimatePresence mode="wait">
+          {guestPreview && !result && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card className="border-2 border-indigo-300 bg-indigo-50/30 shadow-lg shadow-indigo-100">
+                <Card.Content>
+                  {/* Header */}
+                  <div className="text-center mb-6">
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 bg-indigo-100">
+                      <FontAwesomeIcon icon="user" className="text-4xl text-indigo-600" />
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-bold text-indigo-700">
+                      Guest Found
+                    </h3>
+                    <p className="text-sm text-indigo-600 mt-1">Please verify guest details</p>
+                  </div>
+
+                  {/* Guest Details */}
+                  <div className="bg-white rounded-xl p-4 space-y-3 shadow-sm">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-500">Guest Name</span>
+                      <span className="text-sm font-bold text-gray-900 text-right">
+                        {guestPreview.guest?.name}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-500">Phone</span>
+                      <span className="text-sm text-gray-900 text-right">
+                        {guestPreview.guest?.phone}
+                      </span>
+                    </div>
+                    {guestPreview.guest?.category && (
+                      <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span className="text-sm text-gray-500">Category</span>
+                        <span className="text-sm text-gray-900 text-right">
+                          {guestPreview.guest.category}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-500">Event</span>
+                      <span className="text-sm text-gray-900 text-right">
+                        {guestPreview.event?.name}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-sm text-gray-500">Invitation</span>
+                      <span className="text-sm text-gray-900 text-right">
+                        {guestPreview.invitation?.invitationRef}
+                      </span>
+                    </div>
+                    
+                    {/* Contribution Info */}
+                    {guestPreview.guest?.contributions && guestPreview.guest.contributions.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <p className="text-xs text-gray-500 mb-2 font-medium">CONTRIBUTION STATUS</p>
+                        {guestPreview.guest.contributions.map((contrib, idx) => (
+                          <div key={idx} className="flex justify-between items-center py-1">
+                            <span className="text-xs text-gray-600">Status</span>
+                            <Badge status={contrib.status} size="sm" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-6 space-y-3">
+                    <Button
+                      fullWidth
+                      icon="circle-check"
+                      isLoading={isCheckingIn}
+                      onClick={handleConfirmCheckIn}
+                      className="py-4 text-base bg-green-600 hover:bg-green-700"
+                    >
+                      Confirm Check-In
+                    </Button>
+                    <Button
+                      fullWidth
+                      variant="secondary"
+                      icon="times"
+                      onClick={handleReset}
+                      className="py-3"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </Card.Content>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Result Section */}
         <AnimatePresence mode="wait">
           {result && (
@@ -295,38 +425,38 @@ const CheckIn = () => {
               <Card
                 className={
                   result.type === "success"
-                    ? "border-2 border-green-300 bg-green-50/30"
-                    : "border-2 border-red-300 bg-red-50/30"
+                    ? "border-2 border-green-300 bg-green-50/30 shadow-lg shadow-green-100"
+                    : "border-2 border-amber-300 bg-amber-50/30 shadow-lg shadow-amber-100"
                 }
               >
                 <Card.Content>
                   {/* Status Header */}
                   <div className="text-center mb-6">
                     <div
-                      className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-3 ${
+                      className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 ${
                         result.type === "success"
                           ? "bg-green-100"
-                          : "bg-red-100"
+                          : "bg-amber-100"
                       }`}
                     >
                       <FontAwesomeIcon
                         icon={
                           result.type === "success"
                             ? "circle-check"
-                            : "triangle-exclamation"
+                            : "clock"
                         }
-                        className={`text-3xl ${
+                        className={`text-4xl ${
                           result.type === "success"
                             ? "text-green-600"
-                            : "text-red-600"
+                            : "text-amber-600"
                         }`}
                       />
                     </div>
                     <h3
-                      className={`text-xl font-bold ${
+                      className={`text-xl sm:text-2xl font-bold ${
                         result.type === "success"
                           ? "text-green-700"
-                          : "text-red-700"
+                          : "text-amber-700"
                       }`}
                     >
                       {result.message}
@@ -335,49 +465,70 @@ const CheckIn = () => {
 
                   {/* Guest Details */}
                   {result.type === "success" && result.data && (
-                    <div className="space-y-3">
-                      <div className="flex justify-between py-2 border-b border-gray-100">
-                        <span className="text-sm text-gray-500">Guest</span>
-                        <span className="text-sm font-bold text-gray-900">
+                    <div className="bg-white rounded-xl p-4 space-y-3 shadow-sm">
+                      <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span className="text-sm text-gray-500">Guest Name</span>
+                        <span className="text-sm font-bold text-gray-900 text-right">
                           {result.data.guest?.name}
                         </span>
                       </div>
-                      <div className="flex justify-between py-2 border-b border-gray-100">
+                      <div className="flex justify-between items-center py-2 border-b border-gray-100">
                         <span className="text-sm text-gray-500">Phone</span>
-                        <span className="text-sm text-gray-900">
+                        <span className="text-sm text-gray-900 text-right">
                           {result.data.guest?.phone}
                         </span>
                       </div>
-                      <div className="flex justify-between py-2 border-b border-gray-100">
+                      {result.data.guest?.category && (
+                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                          <span className="text-sm text-gray-500">Category</span>
+                          <span className="text-sm text-gray-900 text-right">
+                            {result.data.guest.category}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center py-2 border-b border-gray-100">
                         <span className="text-sm text-gray-500">Check-In Time</span>
-                        <span className="text-sm text-gray-900">
+                        <span className="text-sm text-gray-900 text-right">
                           {formatDateTime(result.data.checkIn?.checkedInAt)}
                         </span>
                       </div>
-                      <div className="flex justify-between py-2">
+                      <div className="flex justify-between items-center py-2">
                         <span className="text-sm text-gray-500">Checked By</span>
-                        <span className="text-sm text-gray-900">
+                        <span className="text-sm text-gray-900 text-right">
                           {result.data.checkedInBy}
                         </span>
                       </div>
+                      
+                      {/* Contribution Info */}
+                      {result.data.guest?.contributions && result.data.guest.contributions.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <p className="text-xs text-gray-500 mb-2 font-medium">CONTRIBUTION STATUS</p>
+                          {result.data.guest.contributions.map((contrib, idx) => (
+                            <div key={idx} className="flex justify-between items-center py-1">
+                              <span className="text-xs text-gray-600">Status</span>
+                              <Badge status={contrib.status} size="sm" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {result.type === "already" && result.data && (
-                    <div className="space-y-3">
-                      <div className="flex justify-between py-2 border-b border-gray-100">
-                        <span className="text-sm text-gray-500">Guest</span>
-                        <span className="text-sm font-bold text-gray-900">
+                    <div className="bg-white rounded-xl p-4 space-y-3 shadow-sm">
+                      <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span className="text-sm text-gray-500">Guest Name</span>
+                        <span className="text-sm font-bold text-gray-900 text-right">
                           {result.data.guest?.name}
                         </span>
                       </div>
-                      <div className="flex justify-between py-2 border-b border-gray-100">
+                      <div className="flex justify-between items-center py-2 border-b border-gray-100">
                         <span className="text-sm text-gray-500">Checked In At</span>
-                        <span className="text-sm text-gray-900">
+                        <span className="text-sm text-gray-900 text-right">
                           {formatDateTime(result.data.checkInDetails?.checkedInAt)}
                         </span>
                       </div>
-                      <div className="flex justify-between py-2">
+                      <div className="flex justify-between items-center py-2">
                         <span className="text-sm text-gray-500">Method</span>
                         <Badge status={result.data.checkInDetails?.method} size="sm" />
                       </div>
@@ -390,6 +541,7 @@ const CheckIn = () => {
                       variant="secondary"
                       icon="rotate-right"
                       onClick={handleReset}
+                      className="py-4 text-base"
                     >
                       Check Another Guest
                     </Button>

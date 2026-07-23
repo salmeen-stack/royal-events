@@ -14,7 +14,7 @@ const router = express.Router();
 
 router.use(authenticate);
 
-router.get("/system", isSuperAdmin, getSystemReport);
+router.get("/system", isStaff, getSystemReport);
 router.get("/event/:eventId/financial", isStaff, getEventFinancialReport);
 router.get("/event/:eventId/guests", isStaff, getEventGuestReport);
 router.get("/event/:eventId/invitations", isStaff, getEventInvitationReport);

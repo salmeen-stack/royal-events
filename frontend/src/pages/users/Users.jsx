@@ -32,7 +32,6 @@ const Users = () => {
     name: "",
     email: "",
     phone: "",
-    password: "",
     role: "STAFF",
   });
 
@@ -59,17 +58,17 @@ const Users = () => {
   };
 
   const handleCreate = async () => {
-    if (!form.name || !form.email || !form.password) {
-      toast.error("Name, email and password are required.");
+    if (!form.name || !form.email) {
+      toast.error("Name and email are required.");
       return;
     }
     setCreateLoading(true);
     try {
       const response = await userService.create(form);
       if (response.success) {
-        toast.success("User created successfully!");
+        toast.success(response.message);
         setShowCreateModal(false);
-        setForm({ name: "", email: "", phone: "", password: "", role: "STAFF" });
+        setForm({ name: "", email: "", phone: "", role: "STAFF" });
         fetchUsers();
       }
     } catch (err) {
@@ -247,15 +246,6 @@ const Users = () => {
             value={form.phone}
             onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
           />
-          <Input
-            label="Password"
-            type="password"
-            icon="lock"
-            placeholder="Min 8 characters"
-            value={form.password}
-            onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-            required
-          />
           <Select
             label="Role"
             options={USER_ROLES}
@@ -263,6 +253,10 @@ const Users = () => {
             onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}
             required
           />
+          <p className="text-xs text-gray-500 bg-blue-50 p-2 rounded">
+            <FontAwesomeIcon icon="info-circle" className="mr-1" />
+            Default password: royalevent123
+          </p>
         </div>
       </Modal>
     </div>

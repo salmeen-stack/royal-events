@@ -3,6 +3,8 @@ import express from "express";
 import {
   getAllCheckIns,
   getCheckInById,
+  verifyQRToken,
+  verifySMSToken,
   checkInByQR,
   checkInBySMSToken,
   manualCheckIn,
@@ -18,6 +20,8 @@ router.use(isStaff);
 router.get("/", getAllCheckIns);
 router.get("/event/:eventId/stats", getEventCheckInStats);
 router.get("/:id", getCheckInById);
+router.post("/verify/qr", verifyQRToken);
+router.post("/verify/token", verifySMSToken);
 router.post("/qr", checkInByQR);
 router.post("/token", checkInBySMSToken);
 router.post("/manual", manualCheckIn);

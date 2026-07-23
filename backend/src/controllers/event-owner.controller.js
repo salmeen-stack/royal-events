@@ -1,5 +1,6 @@
   
 import prisma from "../config/prisma.js";
+import { hashPassword } from "../utils/hash.js";
 import { successResponse, errorResponse, paginatedResponse } from "../utils/response.js";
 
 // ==========================================
@@ -102,6 +103,7 @@ export const createEventOwner = async (req, res) => {
       return errorResponse(res, "Name, email and phone are required.");
     }
 
+    // Check if event owner already exists
     const existingOwner = await prisma.eventOwner.findUnique({
       where: { email: email.toLowerCase().trim() },
     });
@@ -110,17 +112,47 @@ export const createEventOwner = async (req, res) => {
       return errorResponse(res, "An event owner with this email already exists.");
     }
 
-    const eventOwner = await prisma.eventOwner.create({
-      data: {
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        phone: phone.trim(),
-        address: address || null,
-        isActive: true,
-      },
+    // Check if user account already exists with this email
+    const existingUser = await prisma.user.findUnique({
+      where: { email: email.toLowerCase().trim() },
     });
 
-    return successResponse(res, "Event owner created successfully.", eventOwner, 201);
+    if (existingUser) {
+      return errorResponse(res, "A user account with this email already exists.");
+    }
+
+    // Default password
+    const defaultPassword = "royalevent123";
+    const passwordHash = await hashPassword(defaultPassword);
+
+    // Create event owner and user account in a transaction
+    const eventOwner = await prisma.$transaction(async (tx) => {
+      const owner = await tx.eventOwner.create({
+        data: {
+          name: name.trim(),
+          email: email.toLowerCase().trim(),
+          phone: phone.trim(),
+          address: address || null,
+          isActive: true,
+        },
+      });
+
+      // Create corresponding user account
+      await tx.user.create({
+        data: {
+          name: name.trim(),
+          email: email.toLowerCase().trim(),
+          phone: phone.trim(),
+          passwordHash,
+          role: "EVENT_OWNER",
+          isActive: true,
+        },
+      });
+
+      return owner;
+    });
+
+    return successResponse(res, "Event owner created successfully. Default password: royalevent123", eventOwner, 201);
 
   } catch (error) {
     console.error("Create event owner error:", error);

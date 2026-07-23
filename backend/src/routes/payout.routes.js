@@ -13,9 +13,9 @@ const router = express.Router();
 
 router.use(authenticate);
 
-router.get("/", isStaff, getAllPayouts);
-router.get("/event/:eventId/summary", isStaff, getEventPayoutSummary);
-router.get("/:id", isStaff, getPayoutById);
+router.get("/", isSuperAdmin, getAllPayouts);
+router.get("/event/:eventId/summary", isSuperAdmin, getEventPayoutSummary);
+router.get("/:id", isSuperAdmin, getPayoutById);
 router.post("/", isSuperAdmin, createPayout);
 router.patch("/:id/status", isSuperAdmin, updatePayoutStatus);
 

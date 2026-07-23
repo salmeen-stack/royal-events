@@ -98,6 +98,150 @@ export const getCheckInById = async (req, res) => {
 };
 
 // ==========================================
+// VERIFY QR TOKEN (GET GUEST DETAILS)
+// ==========================================
+
+export const verifyQRToken = async (req, res) => {
+  try {
+    const { qrToken } = req.body;
+
+    if (!qrToken) {
+      return errorResponse(res, "QR token is required.");
+    }
+
+    // Find invitation by QR token
+    const invitation = await prisma.invitation.findUnique({
+      where: { qrToken },
+      include: {
+        guest: {
+          include: {
+            contributions: {
+              select: {
+                expectedAmount: true,
+                paidAmount: true,
+                balanceAmount: true,
+                status: true,
+              },
+            },
+          },
+        },
+        event: {
+          select: {
+            id: true,
+            name: true,
+            eventDate: true,
+            venue: true,
+            eventReference: true,
+          },
+        },
+        checkIn: true,
+      },
+    });
+
+    if (!invitation) {
+      return errorResponse(res, "Invalid QR code. Invitation not found.", 404);
+    }
+
+    return successResponse(res, "Guest verified successfully.", {
+      guest: {
+        id: invitation.guest.id,
+        name: invitation.guest.name,
+        phone: invitation.guest.phone,
+        category: invitation.guest.category,
+        contributions: invitation.guest.contributions,
+      },
+      event: invitation.event,
+      invitation: {
+        id: invitation.id,
+        invitationRef: invitation.invitationRef,
+        channel: invitation.channel,
+      },
+      alreadyCheckedIn: !!invitation.checkIn,
+      checkInDetails: invitation.checkIn ? {
+        checkedInAt: invitation.checkIn.checkedInAt,
+        method: invitation.checkIn.method,
+      } : null,
+    });
+
+  } catch (error) {
+    console.error("Verify QR token error:", error);
+    return errorResponse(res, "Failed to verify guest.", 500);
+  }
+};
+
+// ==========================================
+// VERIFY SMS TOKEN (GET GUEST DETAILS)
+// ==========================================
+
+export const verifySMSToken = async (req, res) => {
+  try {
+    const { smsToken } = req.body;
+
+    if (!smsToken) {
+      return errorResponse(res, "SMS token is required.");
+    }
+
+    // Find invitation by SMS token
+    const invitation = await prisma.invitation.findUnique({
+      where: { smsToken: smsToken.toUpperCase().trim() },
+      include: {
+        guest: {
+          include: {
+            contributions: {
+              select: {
+                expectedAmount: true,
+                paidAmount: true,
+                balanceAmount: true,
+                status: true,
+              },
+            },
+          },
+        },
+        event: {
+          select: {
+            id: true,
+            name: true,
+            eventDate: true,
+            venue: true,
+            eventReference: true,
+          },
+        },
+        checkIn: true,
+      },
+    });
+
+    if (!invitation) {
+      return errorResponse(res, "Invalid token. Guest not found.", 404);
+    }
+
+    return successResponse(res, "Guest verified successfully.", {
+      guest: {
+        id: invitation.guest.id,
+        name: invitation.guest.name,
+        phone: invitation.guest.phone,
+        category: invitation.guest.category,
+        contributions: invitation.guest.contributions,
+      },
+      event: invitation.event,
+      invitation: {
+        id: invitation.id,
+        invitationRef: invitation.invitationRef,
+        channel: invitation.channel,
+      },
+      alreadyCheckedIn: !!invitation.checkIn,
+      checkInDetails: invitation.checkIn ? {
+        checkedInAt: invitation.checkIn.checkedInAt,
+        method: invitation.checkIn.method,
+      } : null,
+    });
+
+  } catch (error) {
+    console.error("Verify SMS token error:", error);
+    return errorResponse(res, "Failed to verify guest.", 500);
+  }
+};
+
+// ==========================================
 // CHECK IN BY QR TOKEN
 // ==========================================
 

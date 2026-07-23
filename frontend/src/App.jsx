@@ -19,6 +19,7 @@ import Reports from "./pages/reports/Reports";
 import Payouts from "./pages/payouts/Payouts";
 import Users from "./pages/users/Users";
 import AuditLogs from "./pages/audit/AuditLogs";
+import EventOwners from "./pages/event-owners/EventOwners";
 import ContributionPage from "./pages/public/ContributionPage";
 import VerifyPage from "./pages/public/VerifyPage";
 
@@ -36,6 +37,14 @@ const PublicRoute = ({ children }) => {
     return <Navigate to="/dashboard" replace />;
   }
   return children;
+};
+
+const RoleBasedRedirect = () => {
+  const { user } = useAuthStore();
+  if (user?.role === "EVENT_OWNER") {
+    return <Navigate to="/events" replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
 };
 
 const App = () => {
@@ -81,7 +90,7 @@ const App = () => {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<RoleBasedRedirect />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="events" element={<Events />} />
           <Route path="events/create" element={<CreateEvent />} />
@@ -96,6 +105,7 @@ const App = () => {
           <Route path="notifications" element={<Notifications />} />
           <Route path="reports" element={<Reports />} />
           <Route path="payouts" element={<Payouts />} />
+          <Route path="event-owners" element={<EventOwners />} />
           <Route path="users" element={<Users />} />
           <Route path="audit" element={<AuditLogs />} />
         </Route>

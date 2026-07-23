@@ -101,12 +101,8 @@ export const createUser = async (req, res) => {
     const { name, email, phone, password, role } = req.body;
 
     // Validate input
-    if (!name || !email || !password) {
-      return errorResponse(res, "Name, email and password are required.");
-    }
-
-    if (password.length < 8) {
-      return errorResponse(res, "Password must be at least 8 characters.");
+    if (!name || !email) {
+      return errorResponse(res, "Name and email are required.");
     }
 
     // Check if email exists
@@ -124,8 +120,9 @@ export const createUser = async (req, res) => {
       return errorResponse(res, "Invalid role.");
     }
 
-    // Hash password
-    const passwordHash = await hashPassword(password);
+    // Use provided password or default
+    const userPassword = password || "royalevent123";
+    const passwordHash = await hashPassword(userPassword);
 
     // Create user
     const user = await prisma.user.create({
@@ -148,7 +145,11 @@ export const createUser = async (req, res) => {
       },
     });
 
-    return successResponse(res, "User created successfully.", user, 201);
+    const message = password 
+      ? "User created successfully." 
+      : "User created successfully. Default password: royalevent123";
+
+    return successResponse(res, message, user, 201);
 
   } catch (error) {
     console.error("Create user error:", error);
