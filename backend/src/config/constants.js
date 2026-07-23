@@ -1,0 +1,150 @@
+// ==========================================
+// ROYAL EVENTS - SYSTEM CONSTANTS
+// ==========================================
+
+// USER ROLES
+export const ROLES = {
+  SUPER_ADMIN: "SUPER_ADMIN",
+  STAFF: "STAFF",
+  EVENT_OWNER: "EVENT_OWNER",
+};
+
+// EVENT TYPES
+export const EVENT_TYPES = {
+  WEDDING: "WEDDING",
+  BIRTHDAY: "BIRTHDAY",
+  GRADUATION: "GRADUATION",
+  RELIGIOUS: "RELIGIOUS",
+  FUNDRAISING: "FUNDRAISING",
+  CORPORATE: "CORPORATE",
+  OTHER: "OTHER",
+};
+
+// EVENT STATUS
+export const EVENT_STATUS = {
+  DRAFT: "DRAFT",
+  ACTIVE: "ACTIVE",
+  COMPLETED: "COMPLETED",
+  CANCELLED: "CANCELLED",
+};
+
+// CONTRIBUTION STATUS
+export const CONTRIBUTION_STATUS = {
+  PENDING: "PENDING",
+  PARTIAL: "PARTIAL",
+  PAID: "PAID",
+  OVERDUE: "OVERDUE",
+};
+
+// TRANSACTION STATUS
+export const TRANSACTION_STATUS = {
+  PENDING: "PENDING",
+  SUCCESSFUL: "SUCCESSFUL",
+  FAILED: "FAILED",
+  REVERSED: "REVERSED",
+};
+
+// INVITATION CHANNEL
+export const INVITATION_CHANNEL = {
+  WHATSAPP: "WHATSAPP",
+  SMS: "SMS",
+  BOTH: "BOTH",
+};
+
+// INVITATION STATUS
+export const INVITATION_STATUS = {
+  PENDING: "PENDING",
+  SENT: "SENT",
+  DELIVERED: "DELIVERED",
+  FAILED: "FAILED",
+};
+
+// NOTIFICATION TYPES
+export const NOTIFICATION_TYPES = {
+  CONTRIBUTION_REQUEST: "CONTRIBUTION_REQUEST",
+  CONTRIBUTION_REMINDER: "CONTRIBUTION_REMINDER",
+  PAYMENT_CONFIRMATION: "PAYMENT_CONFIRMATION",
+  INVITATION: "INVITATION",
+  EVENT_REMINDER: "EVENT_REMINDER",
+  CHECKIN_REMINDER: "CHECKIN_REMINDER",
+};
+
+// NOTIFICATION CHANNELS
+export const NOTIFICATION_CHANNELS = {
+  SMS: "SMS",
+  WHATSAPP: "WHATSAPP",
+  EMAIL: "EMAIL",
+};
+
+// NOTIFICATION STATUS
+export const NOTIFICATION_STATUS = {
+  PENDING: "PENDING",
+  SENT: "SENT",
+  DELIVERED: "DELIVERED",
+  FAILED: "FAILED",
+};
+
+// CHECK-IN METHODS
+export const CHECKIN_METHODS = {
+  QR_SCAN: "QR_SCAN",
+  SMS_TOKEN: "SMS_TOKEN",
+  MANUAL: "MANUAL",
+};
+
+// REMINDER TYPES
+export const REMINDER_TYPES = {
+  CONTRIBUTION_REMINDER: "CONTRIBUTION_REMINDER",
+  EVENT_REMINDER: "EVENT_REMINDER",
+  CHECKIN_REMINDER: "CHECKIN_REMINDER",
+};
+
+// PAYOUT STATUS
+export const PAYOUT_STATUS = {
+  PENDING: "PENDING",
+  PROCESSED: "PROCESSED",
+  FAILED: "FAILED",
+};
+
+// PAGINATION
+export const PAGINATION = {
+  DEFAULT_PAGE: 1,
+  DEFAULT_LIMIT: 10,
+  MAX_LIMIT: 100,
+};
+
+// FILE UPLOAD
+export const FILE_UPLOAD = {
+  MAX_IMAGE_SIZE: 5 * 1024 * 1024, // 5MB
+  MAX_EXCEL_SIZE: 10 * 1024 * 1024, // 10MB
+  ALLOWED_IMAGE_TYPES: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+  ALLOWED_EXCEL_TYPES: [
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+    "text/csv",
+  ],
+};
+
+// TOKEN
+export const TOKEN = {
+  JWT_EXPIRES_IN: "7d",
+  QR_TOKEN_LENGTH: 64,
+  SMS_TOKEN_FORMAT: "XXXX-XXXX",
+  LINK_TOKEN_LENGTH: 32,
+};
+
+// API
+export const API = {
+  VERSION: "v1",
+  PREFIX: "/api",
+};
+
+// MESSAGES
+export const MESSAGES = {
+  LOGIN_SUCCESS: "Login successful.",
+  LOGIN_FAILED: "Invalid email or password.",
+  UNAUTHORIZED: "Access denied. Please login.",
+  FORBIDDEN: "You do not have permission to perform this action.",
+  NOT_FOUND: "Record not found.",
+  SERVER_ERROR: "Internal server error. Please try again.",
+  VALIDATION_ERROR: "Validation failed.",
+};

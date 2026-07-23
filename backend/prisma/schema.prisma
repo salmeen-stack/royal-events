@@ -1,0 +1,419 @@
+// Royal Events - Prisma Schema
+// Database: PostgreSQL on Neon
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// USERS & ROLES
+// ==========================================
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  passwordHash String
+  role         UserRole @default(STAFF)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  eventsCreated    Event[]   @relation("CreatedByStaff")
+  checkInsRecorded CheckIn[] @relation("CheckedInByStaff")
+  auditLogs        AuditLog[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  STAFF
+  EVENT_OWNER
+}
+
+// ==========================================
+// EVENT OWNERS
+// ==========================================
+
+model EventOwner {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events Event[]
+
+  @@map("event_owners")
+}
+
+// ==========================================
+// EVENTS
+// ==========================================
+
+model Event {
+  id                   String      @id @default(uuid())
+  eventReference       String      @unique
+  name                 String
+  type                 EventType
+  description          String?
+  eventDate            DateTime
+  eventTime            String
+  venue                String
+  location             String
+  googleMapsUrl        String?
+  imageUrl             String?
+  contributionTarget   Decimal     @default(0)
+  contributionDeadline DateTime?
+  paymentInstructions  String?
+  eventProgram         String?
+  status               EventStatus @default(DRAFT)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  eventOwnerId String
+  createdById  String
+
+  eventOwner    EventOwner     @relation(fields: [eventOwnerId], references: [id])
+  createdBy     User           @relation("CreatedByStaff", fields: [createdById], references: [id])
+  guests        Guest[]
+  contributions Contribution[]
+  transactions  Transaction[]
+  invitations   Invitation[]
+  notifications Notification[]
+  reminders     Reminder[]
+  checkIns      CheckIn[]
+  payouts       Payout[]
+  auditLogs     AuditLog[]
+
+  @@map("events")
+}
+
+enum EventType {
+  WEDDING
+  BIRTHDAY
+  GRADUATION
+  RELIGIOUS
+  FUNDRAISING
+  CORPORATE
+  OTHER
+}
+
+enum EventStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// ==========================================
+// GUESTS
+// ==========================================
+
+model Guest {
+  id                   String   @id @default(uuid())
+  name                 String
+  phone                String
+  email                String?
+  category             String?
+  expectedContribution Decimal  @default(0)
+  notes                String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  eventId String
+
+  event         Event          @relation(fields: [eventId], references: [id])
+  contributions Contribution[]
+  transactions  Transaction[]
+  invitations   Invitation[]
+  notifications Notification[]
+  checkIns      CheckIn[]
+
+  @@map("guests")
+}
+
+// ==========================================
+// CONTRIBUTIONS
+// ==========================================
+
+model Contribution {
+  id               String             @id @default(uuid())
+  expectedAmount   Decimal            @default(0)
+  paidAmount       Decimal            @default(0)
+  balanceAmount    Decimal            @default(0)
+  status           ContributionStatus @default(PENDING)
+  contributionLink String?            @unique
+  linkToken        String?            @unique
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  eventId String
+  guestId String
+
+  event        Event         @relation(fields: [eventId], references: [id])
+  guest        Guest         @relation(fields: [guestId], references: [id])
+  transactions Transaction[]
+
+  @@map("contributions")
+}
+
+enum ContributionStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+// ==========================================
+// TRANSACTIONS
+// ==========================================
+
+model Transaction {
+  id             String            @id @default(uuid())
+  transactionRef String            @unique
+  snippeRef      String?
+  amount         Decimal
+  paymentMethod  String?
+  status         TransactionStatus @default(PENDING)
+  failureReason  String?
+  paidAt         DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  eventId        String
+  guestId        String
+  contributionId String
+
+  event        Event        @relation(fields: [eventId], references: [id])
+  guest        Guest        @relation(fields: [guestId], references: [id])
+  contribution Contribution @relation(fields: [contributionId], references: [id])
+
+  @@map("transactions")
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  REVERSED
+}
+
+// ==========================================
+// INVITATIONS
+// ==========================================
+
+model Invitation {
+  id            String            @id @default(uuid())
+  invitationRef String            @unique
+  qrToken       String            @unique
+  smsToken      String            @unique
+  qrCodeUrl     String?
+  channel       InvitationChannel
+  status        InvitationStatus  @default(PENDING)
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  eventId String
+  guestId String
+
+  event   Event    @relation(fields: [eventId], references: [id])
+  guest   Guest    @relation(fields: [guestId], references: [id])
+  checkIn CheckIn?
+
+  @@map("invitations")
+}
+
+enum InvitationChannel {
+  WHATSAPP
+  SMS
+  BOTH
+}
+
+enum InvitationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+// ==========================================
+// NOTIFICATIONS
+// ==========================================
+
+model Notification {
+  id            String              @id @default(uuid())
+  type          NotificationType
+  channel       NotificationChannel
+  recipient     String
+  message       String
+  status        NotificationStatus  @default(PENDING)
+  providerRef   String?
+  failureReason String?
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime            @default(now())
+
+  eventId String?
+  guestId String?
+
+  event Event? @relation(fields: [eventId], references: [id])
+  guest Guest? @relation(fields: [guestId], references: [id])
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  CONTRIBUTION_REQUEST
+  CONTRIBUTION_REMINDER
+  PAYMENT_CONFIRMATION
+  INVITATION
+  EVENT_REMINDER
+  CHECKIN_REMINDER
+}
+
+enum NotificationChannel {
+  SMS
+  WHATSAPP
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+// ==========================================
+// REMINDERS
+// ==========================================
+
+model Reminder {
+  id          String       @id @default(uuid())
+  type        ReminderType
+  scheduledAt DateTime
+  sentAt      DateTime?
+  status      String       @default("PENDING")
+  message     String?
+  createdAt   DateTime     @default(now())
+
+  eventId String
+
+  event Event @relation(fields: [eventId], references: [id])
+
+  @@map("reminders")
+}
+
+enum ReminderType {
+  CONTRIBUTION_REMINDER
+  EVENT_REMINDER
+  CHECKIN_REMINDER
+}
+
+// ==========================================
+// CHECK-INS
+// ==========================================
+
+model CheckIn {
+  id          String        @id @default(uuid())
+  method      CheckInMethod
+  checkedInAt DateTime      @default(now())
+  notes       String?
+
+  eventId      String
+  guestId      String
+  invitationId String @unique
+  staffId      String
+
+  event      Event      @relation(fields: [eventId], references: [id])
+  guest      Guest      @relation(fields: [guestId], references: [id])
+  invitation Invitation @relation(fields: [invitationId], references: [id])
+  staff      User       @relation("CheckedInByStaff", fields: [staffId], references: [id])
+
+  @@map("checkins")
+}
+
+enum CheckInMethod {
+  QR_SCAN
+  SMS_TOKEN
+  MANUAL
+}
+
+// ==========================================
+// PAYMENT WEBHOOKS
+// ==========================================
+
+model PaymentWebhook {
+  id          String    @id @default(uuid())
+  provider    String
+  payload     Json
+  status      String    @default("RECEIVED")
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@map("payment_webhooks")
+}
+
+// ==========================================
+// PAYOUTS
+// ==========================================
+
+model Payout {
+  id         String       @id @default(uuid())
+  amount     Decimal
+  fees       Decimal      @default(0)
+  serviceFee Decimal      @default(0)
+  netAmount  Decimal
+  status     PayoutStatus @default(PENDING)
+  payoutRef  String?
+  payoutDate DateTime?
+  notes      String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  eventId String
+
+  event Event @relation(fields: [eventId], references: [id])
+
+  @@map("payouts")
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+// ==========================================
+// AUDIT LOGS
+// ==========================================
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  module    String
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  userId  String?
+  eventId String?
+
+  user  User?  @relation(fields: [userId], references: [id])
+  event Event? @relation(fields: [eventId], references: [id])
+
+  @@map("audit_logs")
+}
