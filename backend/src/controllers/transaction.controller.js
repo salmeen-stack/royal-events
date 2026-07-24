@@ -3,6 +3,7 @@ import prisma from "../config/prisma.js";
 import { successResponse, errorResponse, paginatedResponse } from "../utils/response.js";
 import { generateTransactionRef } from "../utils/token.js";
 import { createSnippePayment } from "../services/payment.service.js";
+import { releaseInvitationAfterPayment } from "../services/invitation.service.js";
 
 // ==========================================
 // GET ALL TRANSACTIONS
@@ -277,7 +278,10 @@ export const handlePaymentWebhook = async (req, res) => {
 
       // If fully paid - trigger invitation release
       if (newStatus === "PAID") {
-        console.log(`✅ Payment complete for guest: ${transaction.guest.name}. Invitation to be released.`);
+        console.log(`✅ Payment complete for guest: ${transaction.guest.name}. Releasing invitation...`);
+        
+        // Automatically generate and send invitation
+        await releaseInvitationAfterPayment({ contributionId: transaction.contributionId });
       }
 
     } else if (status === "FAILED") {

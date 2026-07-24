@@ -1,45 +1,50 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import PageHeader from "../../components/layout/PageHeader";
-import Stat from "../../components/ui/Stat";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Spinner from "../../components/ui/Spinner";
-import ContributionChart from "../../components/charts/ContributionChart";
-import AttendanceChart from "../../components/charts/AttendanceChart";
-import eventService from "../../services/event.service";
+import guestService from "../../services/guest.service";
+import contributionService from "../../services/contribution.service";
+import invitationService from "../../services/invitation.service";
 import {
   formatCurrency,
   formatDate,
-  getDaysUntilEvent,
 } from "../../utils/formatters";
 import { getErrorMessage } from "../../utils/helpers";
 
-const EventDetail = () => {
+const GuestDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [event, setEvent] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [guest, setGuest] = useState(null);
+  const [contribution, setContribution] = useState(null);
+  const [invitation, setInvitation] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetchEventData();
+    fetchGuestData();
   }, [id]);
 
-  const fetchEventData = async () => {
+  const fetchGuestData = async () => {
     try {
       setIsLoading(true);
-      const [eventResponse, statsResponse] = await Promise.all([
-        eventService.getById(id),
-        eventService.getStats(id),
-      ]);
-
-      if (eventResponse.success) setEvent(eventResponse.data);
-      if (statsResponse.success) setStats(statsResponse.data);
+      const guestResponse = await guestService.getById(id);
+      
+      if (guestResponse.success) {
+        setGuest(guestResponse.data);
+        
+        // Fetch contribution and invitation if they exist
+        if (guestResponse.data.contributions && guestResponse.data.contributions.length > 0) {
+          setContribution(guestResponse.data.contributions[0]);
+        }
+        
+        if (guestResponse.data.invitations && guestResponse.data.invitations.length > 0) {
+          setInvitation(guestResponse.data.invitations[0]);
+        }
+      }
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -47,7 +52,7 @@ const EventDetail = () => {
     }
   };
 
-  if (isLoading) return <Spinner.Page text="Loading event..." />;
+  if (isLoading) return <Spinner.Page text="Loading guest..." />;
 
   if (error) {
     return (
@@ -57,124 +62,200 @@ const EventDetail = () => {
           className="text-4xl text-red-300"
         />
         <p className="text-gray-600">{error}</p>
-        <Button variant="secondary" onClick={() => navigate("/events")}>
-          Back to Events
+        <Button variant="secondary" onClick={() => navigate("/guests")}>
+          Back to Guests
         </Button>
       </div>
     );
   }
 
-  const guests = stats?.guests || {};
-  const financial = stats?.financial || {};
-  const invitations = stats?.invitations || {};
-  const attendance = stats?.attendance || {};
-
-  const chartData = [
-    {
-      name: "Target",
-      expected: parseFloat(financial.target || 0),
-      paid: 0,
-    },
-    {
-      name: "Expected",
-      expected: parseFloat(financial.totalExpected || 0),
-      paid: 0,
-    },
-    {
-      name: "Paid",
-      expected: 0,
-      paid: parseFloat(financial.totalPaid || 0),
-    },
-  ];
-
   return (
     <div>
       <PageHeader
-        title={event?.name}
-        subtitle={`${event?.eventReference} | ${formatDate(event?.eventDate)} | ${event?.venue}`}
-        icon="calendar-day"
-        backPath="/events"
+        title={guest?.name}
+        subtitle={`${guest?.phone} | ${guest?.email || "No email"}`}
+        icon="user"
+        backPath="/guests"
         actions={
-          <div className="flex items-center gap-2">
-            <Badge status={event?.status} size="lg" dot />
-            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              <FontAwesomeIcon icon="clock" className="mr-1 text-gray-400" />
-              {getDaysUntilEvent(event?.eventDate)}
-            </span>
-          </div>
+          <Badge 
+            status={contribution?.status || "PENDING"} 
+            size="lg" 
+            dot 
+          />
         }
       />
 
-      {/* Guest & Financial Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Stat
-          title="Total Guests"
-          value={guests.total || 0}
-          icon="users"
-          color="blue"
-          delay={0}
-        />
-        <Stat
-          title="Paid Guests"
-          value={guests.paid || 0}
-          icon="user-check"
-          color="green"
-          delay={0.1}
-        />
-        <Stat
-          title="Total Collected"
-          value={formatCurrency(financial.totalPaid || 0)}
-          icon="hand-holding-dollar"
-          color="green"
-          delay={0.2}
-        />
-        <Stat
-          title="Outstanding"
-          value={formatCurrency(financial.totalBalance || 0)}
-          icon="clock"
-          color="orange"
-          delay={0.3}
-        />
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <Card>
-          <Card.Header>
-            <Card.Title>
-              <FontAwesomeIcon
-                icon="chart-area"
-                className="text-indigo-500 mr-2"
-              />
-              Financial Overview
-            </Card.Title>
-          </Card.Header>
-          <Card.Content>
-            <ContributionChart data={chartData} />
-          </Card.Content>
-        </Card>
-
-        <Card>
-          <Card.Header>
-            <Card.Title>
-              <FontAwesomeIcon
-                icon="chart-pie"
-                className="text-indigo-500 mr-2"
-              />
-              Attendance
-            </Card.Title>
-          </Card.Header>
-          <Card.Content>
-            <AttendanceChart
-              checkedIn={attendance.totalCheckIns || 0}
-              total={guests.total || 0}
+      {/* Guest Information */}
+      <Card className="mb-6">
+        <Card.Header>
+          <Card.Title>
+            <FontAwesomeIcon
+              icon="circle-info"
+              className="text-indigo-500 mr-2"
             />
+            Guest Information
+          </Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Full Name
+                </p>
+                <p className="text-sm text-gray-900 mt-0.5">
+                  {guest?.name}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Phone Number
+                </p>
+                <p className="text-sm text-gray-900 mt-0.5">
+                  {guest?.phone}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Email
+                </p>
+                <p className="text-sm text-gray-900 mt-0.5">
+                  {guest?.email || "N/A"}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Category
+                </p>
+                <p className="text-sm text-gray-900 mt-0.5">
+                  {guest?.category || "N/A"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Event
+                </p>
+                <p className="text-sm text-gray-900 mt-0.5">
+                  {guest?.event?.name || "N/A"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Notes
+                </p>
+                <p className="text-sm text-gray-900 mt-0.5">
+                  {guest?.notes || "No notes"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card.Content>
+      </Card>
+
+      {/* Contribution Information */}
+      {contribution && (
+        <Card className="mb-6">
+          <Card.Header>
+            <Card.Title>
+              <FontAwesomeIcon
+                icon="hand-holding-dollar"
+                className="text-indigo-500 mr-2"
+              />
+              Contribution Details
+            </Card.Title>
+          </Card.Header>
+          <Card.Content>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Expected Amount
+                </p>
+                <p className="text-lg font-semibold text-gray-900 mt-0.5">
+                  {formatCurrency(contribution.expectedAmount)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Paid Amount
+                </p>
+                <p className="text-lg font-semibold text-green-600 mt-0.5">
+                  {formatCurrency(contribution.paidAmount)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Balance
+                </p>
+                <p className="text-lg font-semibold text-orange-600 mt-0.5">
+                  {formatCurrency(contribution.balanceAmount)}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Status:
+                </span>
+                <Badge status={contribution.status} size="sm" dot />
+              </div>
+            </div>
           </Card.Content>
         </Card>
-      </div>
+      )}
+
+      {/* Invitation Information */}
+      {invitation && (
+        <Card className="mb-6">
+          <Card.Header>
+            <Card.Title>
+              <FontAwesomeIcon
+                icon="envelope"
+                className="text-indigo-500 mr-2"
+              />
+              Invitation Details
+            </Card.Title>
+          </Card.Header>
+          <Card.Content>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Invitation Reference
+                </p>
+                <p className="text-sm text-gray-900 mt-0.5">
+                  {invitation.invitationRef}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Channel
+                </p>
+                <p className="text-sm text-gray-900 mt-0.5">
+                  {invitation.channel}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Status
+                </p>
+                <Badge status={invitation.status} size="sm" dot />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Sent At
+                </p>
+                <p className="text-sm text-gray-900 mt-0.5">
+                  {invitation.sentAt ? formatDate(invitation.sentAt) : "Not sent"}
+                </p>
+              </div>
+            </div>
+          </Card.Content>
+        </Card>
+      )}
 
       {/* Quick Actions */}
-      <Card className="mb-6">
+      <Card>
         <Card.Header>
           <Card.Title>
             <FontAwesomeIcon
@@ -185,133 +266,43 @@ const EventDetail = () => {
           </Card.Title>
         </Card.Header>
         <Card.Content>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Button
               variant="secondary"
               size="sm"
-              icon="user-plus"
+              icon="envelope"
               fullWidth
-              onClick={() => navigate(`/guests?eventId=${id}`)}
+              onClick={() => navigate(`/invitations?guestId=${id}`)}
             >
-              Guests
+              Send Invitation
             </Button>
             <Button
               variant="secondary"
               size="sm"
               icon="hand-holding-dollar"
               fullWidth
-              onClick={() => navigate(`/contributions?eventId=${id}`)}
+              onClick={() => navigate(`/contributions?guestId=${id}`)}
             >
-              Contributions
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon="credit-card"
-              fullWidth
-              onClick={() => navigate(`/transactions?eventId=${id}`)}
-            >
-              Transactions
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon="envelope"
-              fullWidth
-              onClick={() => navigate(`/invitations?eventId=${id}`)}
-            >
-              Invitations
+              Contribution
             </Button>
             <Button
               variant="secondary"
               size="sm"
               icon="qrcode"
               fullWidth
-              onClick={() => navigate(`/checkin?eventId=${id}`)}
+              onClick={() => navigate(`/checkin?guestId=${id}`)}
             >
               Check-In
             </Button>
             <Button
               variant="secondary"
               size="sm"
-              icon="chart-bar"
+              icon="edit"
               fullWidth
-              onClick={() => navigate(`/reports?eventId=${id}`)}
+              onClick={() => navigate(`/guests/${id}/edit`)}
             >
-              Reports
+              Edit Guest
             </Button>
-          </div>
-        </Card.Content>
-      </Card>
-
-      {/* Event Details */}
-      <Card>
-        <Card.Header>
-          <Card.Title>
-            <FontAwesomeIcon
-              icon="circle-info"
-              className="text-indigo-500 mr-2"
-            />
-            Event Details
-          </Card.Title>
-        </Card.Header>
-        <Card.Content>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Event Owner
-                </p>
-                <p className="text-sm text-gray-900 mt-0.5">
-                  {event?.eventOwner?.name || "N/A"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Contact
-                </p>
-                <p className="text-sm text-gray-900 mt-0.5">
-                  {event?.eventOwner?.phone || "N/A"} |{" "}
-                  {event?.eventOwner?.email || "N/A"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Venue
-                </p>
-                <p className="text-sm text-gray-900 mt-0.5">
-                  {event?.venue}, {event?.location}
-                </p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Contribution Target
-                </p>
-                <p className="text-sm text-gray-900 mt-0.5">
-                  {formatCurrency(event?.contributionTarget || 0)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Contribution Deadline
-                </p>
-                <p className="text-sm text-gray-900 mt-0.5">
-                  {event?.contributionDeadline
-                    ? formatDate(event.contributionDeadline)
-                    : "No deadline set"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Description
-                </p>
-                <p className="text-sm text-gray-900 mt-0.5">
-                  {event?.description || "No description"}
-                </p>
-              </div>
-            </div>
           </div>
         </Card.Content>
       </Card>
@@ -319,4 +310,4 @@ const EventDetail = () => {
   );
 };
 
-export default EventDetail;
+export default GuestDetail;

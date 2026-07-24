@@ -105,8 +105,10 @@ export const sendWhatsAppInvitation = async ({
     year: "numeric",
   });
 
+  const invitationLink = `${process.env.FRONTEND_URL}/invitation/${invitation.qrToken}`;
+
   const message =
-    `🎉 *You Are Invited!*\n\n` +
+    `💒 *Wedding Invitation*\n\n` +
     `Dear *${guest.name}*,\n\n` +
     `Your contribution has been received.\n\n` +
     `You are officially invited to:\n\n` +
@@ -116,7 +118,9 @@ export const sendWhatsAppInvitation = async ({
     `📍 *Venue:* ${event.venue}\n` +
     `🗺️ *Location:* ${event.location}\n\n` +
     `*Invitation Reference:* ${invitation.invitationRef}\n\n` +
-    `Please present your QR code at the event entrance for check-in.\n\n` +
+    `🎁 *Click below to view your beautiful invitation card with your QR code:*\n` +
+    `${invitationLink}\n\n` +
+    `Present your QR code at the event entrance for check-in.\n\n` +
     `We look forward to celebrating with you! 🎊`;
 
   return sendWhatsAppMessage({

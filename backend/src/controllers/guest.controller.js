@@ -149,7 +149,7 @@ export const getGuestById = async (req, res) => {
 
 export const createGuest = async (req, res) => {
   try {
-    const { eventId, name, phone, email, category, expectedContribution, notes } = req.body;
+    const { eventId, name, phone, email, category, expectedContribution, requiresInvitation, notes } = req.body;
 
     if (!eventId || !name || !phone) {
       return errorResponse(res, "Event ID, name and phone are required.");
@@ -174,6 +174,7 @@ export const createGuest = async (req, res) => {
         email: email ? email.toLowerCase().trim() : null,
         category: category || null,
         expectedContribution: expectedContribution || 0,
+        requiresInvitation: requiresInvitation !== undefined ? requiresInvitation : true,
         notes: notes || null,
         eventId,
       },
@@ -253,6 +254,7 @@ export const bulkImportGuests = async (req, res) => {
             email: guestData.email ? guestData.email.toLowerCase().trim() : null,
             category: guestData.category || null,
             expectedContribution: guestData.expectedContribution || 0,
+            requiresInvitation: guestData.requiresInvitation !== undefined ? guestData.requiresInvitation : true,
             notes: guestData.notes || null,
             eventId,
           },
@@ -297,7 +299,7 @@ export const bulkImportGuests = async (req, res) => {
 export const updateGuest = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phone, email, category, expectedContribution, notes } = req.body;
+    const { name, phone, email, category, expectedContribution, requiresInvitation, notes } = req.body;
 
     const guest = await prisma.guest.findUnique({ where: { id } });
 
@@ -313,6 +315,7 @@ export const updateGuest = async (req, res) => {
         ...(email !== undefined && { email: email ? email.toLowerCase().trim() : null }),
         ...(category !== undefined && { category }),
         ...(expectedContribution !== undefined && { expectedContribution }),
+        ...(requiresInvitation !== undefined && { requiresInvitation }),
         ...(notes !== undefined && { notes }),
       },
     });

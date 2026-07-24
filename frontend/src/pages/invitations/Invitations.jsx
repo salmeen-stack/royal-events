@@ -74,6 +74,46 @@ const Invitations = () => {
     }
   };
 
+  const handleSendViaWhatsApp = (invitation) => {
+    const { guest, event, invitationRef, qrToken } = invitation;
+    
+    // Format phone number (remove +, spaces, dashes)
+    const cleanPhone = guest?.phone?.replace(/[\+\s\-]/g, '');
+    
+    if (!cleanPhone) {
+      toast.error("Guest phone number not available");
+      return;
+    }
+
+    const eventDate = new Date(event?.eventDate).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+
+    const invitationLink = `${window.location.origin}/invitation/${qrToken}`;
+
+    const message =
+      `💒 *Wedding Invitation*\n\n` +
+      `Dear *${guest?.name}*,\n\n` +
+      `You are officially invited to:\n\n` +
+      `📌 *Event:* ${event?.name}\n` +
+      `📅 *Date:* ${eventDate}\n` +
+      `⏰ *Time:* ${event?.eventTime}\n` +
+      `📍 *Venue:* ${event?.venue}\n` +
+      `🗺️ *Location:* ${event?.location}\n\n` +
+      `*Invitation Reference:* ${invitationRef}\n\n` +
+      `🎁 *Click below to view your beautiful invitation card with your QR code:*\n` +
+      `${invitationLink}\n\n` +
+      `Present your QR code at the event entrance for check-in.\n\n` +
+      `We look forward to celebrating with you! 🎊`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+    
+    window.open(whatsappUrl, '_blank');
+  };
+
   const handleBulkGenerate = async () => {
     if (!eventIdParam) {
       toast.error("Please filter by event first.");
@@ -189,20 +229,29 @@ const Invitations = () => {
                         </span>
                       </Table.Cell>
                       <Table.Cell>
-                        {canManageInvitations && inv.status === "PENDING" && (
+                        <div className="flex items-center gap-1">
+                          {canManageInvitations && inv.status === "PENDING" && (
+                            <button
+                              onClick={() => handleSend(inv.id)}
+                              className="p-1.5 rounded text-indigo-600 hover:bg-indigo-50 transition-colors"
+                              title="Send Invitation via SMS"
+                            >
+                              <FontAwesomeIcon icon="paper-plane" className="text-xs" />
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleSend(inv.id)}
-                            className="p-1.5 rounded text-indigo-600 hover:bg-indigo-50 transition-colors"
-                            title="Send Invitation"
+                            onClick={() => handleSendViaWhatsApp(inv)}
+                            className="p-1.5 rounded text-green-600 hover:bg-green-50 transition-colors"
+                            title="Send via WhatsApp"
                           >
-                            <FontAwesomeIcon icon="paper-plane" className="text-xs" />
+                            <FontAwesomeIcon icon="comment" className="text-xs" />
                           </button>
-                        )}
-                        {inv.checkIn && (
-                          <Badge color="green" size="xs" icon="circle-check">
-                            Checked In
-                          </Badge>
-                        )}
+                          {inv.checkIn && (
+                            <Badge color="green" size="xs" icon="circle-check">
+                              Checked In
+                            </Badge>
+                          )}
+                        </div>
                       </Table.Cell>
                     </Table.Row>
                   ))

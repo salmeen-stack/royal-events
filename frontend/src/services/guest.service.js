@@ -2,37 +2,37 @@ import api from "../config/api";
 
 const guestService = {
   getAll: async (params = {}) => {
-    const response = await api.get("/guests", { params });
+    const response = await api.get("/api/guests", { params });
     return response.data;
   },
 
   getById: async (id) => {
-    const response = await api.get(`/guests/${id}`);
+    const response = await api.get(`/api/guests/${id}`);
     return response.data;
   },
 
   create: async (data) => {
-    const response = await api.post("/guests", data);
+    const response = await api.post("/api/guests", data);
     return response.data;
   },
 
   bulkImport: async (data) => {
-    const response = await api.post("/guests/bulk-import", data);
+    const response = await api.post("/api/guests/bulk-import", data);
     return response.data;
   },
 
   update: async (id, data) => {
-    const response = await api.put(`/guests/${id}`, data);
+    const response = await api.put(`/api/guests/${id}`, data);
     return response.data;
   },
 
   delete: async (id) => {
-    const response = await api.delete(`/guests/${id}`);
+    const response = await api.delete(`/api/guests/${id}`);
     return response.data;
   },
 
   getContributionPage: async (token) => {
-    const response = await api.get(`/guests/contribute/${token}`);
+    const response = await api.get(`/api/guests/contribute/${token}`);
     return response.data;
   },
 };

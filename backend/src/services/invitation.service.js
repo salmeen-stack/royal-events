@@ -166,6 +166,16 @@ export const releaseInvitationAfterPayment = async ({ contributionId }) => {
       amount: contribution.paidAmount,
     });
 
+    // Check if guest requires invitation
+    if (!contribution.guest.requiresInvitation) {
+      console.log(`Guest ${contribution.guest.name} does not require invitation. Only reminders will be sent.`);
+      return {
+        success: true,
+        contribution,
+        message: "Payment confirmed. Guest does not require invitation.",
+      };
+    }
+
     // Generate invitation
     const invitationResult = await generateInvitation({
       guestId: contribution.guestId,

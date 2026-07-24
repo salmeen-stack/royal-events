@@ -23,6 +23,8 @@ import AuditLogs from "./pages/audit/AuditLogs";
 import EventOwners from "./pages/event-owners/EventOwners";
 import ContributionPage from "./pages/public/ContributionPage";
 import VerifyPage from "./pages/public/VerifyPage";
+import WeddingInvitation from "./pages/public/WeddingInvitation";
+import InvitationView from "./pages/public/InvitationView";
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuthStore();
@@ -97,6 +99,8 @@ const App = () => {
         />
         <Route path="/contribute/:token" element={<ContributionPage />} />
         <Route path="/checkin/verify/:token" element={<VerifyPage />} />
+        <Route path="/invitation/:token" element={<WeddingInvitation />} />
+        <Route path="/view/:token" element={<InvitationView />} />
 
         {/* Protected Routes */}
         <Route

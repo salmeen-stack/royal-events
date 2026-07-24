@@ -126,6 +126,7 @@ model Guest {
   email                String?
   category             String?
   expectedContribution Decimal  @default(0)
+  requiresInvitation   Boolean  @default(true)
   notes                String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

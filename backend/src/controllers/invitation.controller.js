@@ -243,7 +243,9 @@ export const verifyByQRToken = async (req, res) => {
             id: true,
             name: true,
             eventDate: true,
+            eventTime: true,
             venue: true,
+            location: true,
           },
         },
         checkIn: true,
@@ -268,22 +270,7 @@ export const verifyByQRToken = async (req, res) => {
       });
     }
 
-    return successResponse(res, "VALID INVITATION", {
-      invitation: {
-        id: invitation.id,
-        invitationRef: invitation.invitationRef,
-        channel: invitation.channel,
-        status: invitation.status,
-      },
-      guest: {
-        id: invitation.guest.id,
-        name: invitation.guest.name,
-        phone: invitation.guest.phone,
-        expectedContribution: invitation.guest.expectedContribution,
-      },
-      event: invitation.event,
-      checkInStatus: "NOT CHECKED IN",
-    });
+    return successResponse(res, "VALID INVITATION", invitation);
 
   } catch (error) {
     console.error("Verify QR token error:", error);

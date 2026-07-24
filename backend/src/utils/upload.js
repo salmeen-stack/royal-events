@@ -95,11 +95,21 @@ export const uploadExcel = multer({
 
 export const parseExcelFile = async (filePath) => {
   try {
-    const XLSX = await import("xlsx");
-    const workbook = XLSX.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(worksheet);
+    const ExcelJS = await import("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.worksheets[0];
+    const data = [];
+    
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // Skip header row
+      const rowData = {};
+      row.eachCell((cell, colNumber) => {
+        const header = worksheet.getRow(1).getCell(colNumber).value;
+        rowData[header] = cell.value;
+      });
+      data.push(rowData);
+    });
 
     // Clean up file after parsing
     fs.unlinkSync(filePath);
