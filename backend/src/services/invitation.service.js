@@ -3,7 +3,7 @@ import prisma from "../config/prisma.js";
 import { generateQRToken, generateSMSToken, generateInvitationRef } from "../utils/token.js";
 import { generateQRCodeDataURL } from "./qrcode.service.js";
 import { sendInvitationSMS, sendPaymentConfirmationSMS } from "./sms.service.js";
-import { sendWhatsAppInvitation } from "./whatsapp.service.js";
+import { sendWhatsAppInvitation, checkWhatsAppNumber } from "./whatsapp.service.js";
 
 // ==========================================
 // GENERATE INVITATION FOR GUEST
@@ -95,22 +95,52 @@ export const sendInvitation = async ({ invitationId }) => {
     }
 
     let sendResult;
+    let usedChannel = invitation.channel;
 
+    // Check if WhatsApp is requested and number is on WhatsApp
     if (invitation.channel === "WHATSAPP" || invitation.channel === "BOTH") {
-      sendResult = await sendWhatsAppInvitation({
-        guest: invitation.guest,
-        event: invitation.event,
-        invitation,
-        qrCodeBase64: invitation.qrCodeUrl,
-      });
+      try {
+        const whatsappCheck = await checkWhatsAppNumber(invitation.guest.phone);
+        
+        if (whatsappCheck.isOnWhatsApp) {
+          // Number is on WhatsApp, send via WhatsApp
+          sendResult = await sendWhatsAppInvitation({
+            guest: invitation.guest,
+            event: invitation.event,
+            invitation,
+            qrCodeBase64: invitation.qrCodeUrl,
+          });
+          usedChannel = "WHATSAPP";
+        } else {
+          // Number not on WhatsApp, fallback to SMS
+          console.log(`Number ${invitation.guest.phone} not on WhatsApp, falling back to SMS`);
+          sendResult = await sendInvitationSMS({
+            guest: invitation.guest,
+            event: invitation.event,
+            smsToken: invitation.smsToken,
+          });
+          usedChannel = "SMS";
+        }
+      } catch (error) {
+        // WhatsApp check failed, fallback to SMS
+        console.error("WhatsApp check failed, falling back to SMS:", error.message);
+        sendResult = await sendInvitationSMS({
+          guest: invitation.guest,
+          event: invitation.event,
+          smsToken: invitation.smsToken,
+        });
+        usedChannel = "SMS";
+      }
     }
 
-    if (invitation.channel === "SMS" || invitation.channel === "BOTH") {
+    // If SMS is explicitly requested or as fallback
+    if (invitation.channel === "SMS" || (invitation.channel === "BOTH" && usedChannel !== "WHATSAPP")) {
       sendResult = await sendInvitationSMS({
         guest: invitation.guest,
         event: invitation.event,
         smsToken: invitation.smsToken,
       });
+      usedChannel = "SMS";
     }
 
     // Update invitation status
@@ -126,6 +156,7 @@ export const sendInvitation = async ({ invitationId }) => {
       success: true,
       invitation,
       sendResult,
+      usedChannel,
     };
 
   } catch (error) {

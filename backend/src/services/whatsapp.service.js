@@ -6,7 +6,71 @@ import prisma from "../config/prisma.js";
 dotenv.config();
 
 // ==========================================
-// SEND WHATSAPP MESSAGE
+// CHECK IF NUMBER IS ON WHATSAPP
+// ==========================================
+
+export const checkWhatsAppNumber = async (phone) => {
+  try {
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    const apiVersion = process.env.WHATSAPP_API_VERSION || "v25.0";
+
+    if (!phoneNumberId || !accessToken) {
+      throw new Error("WhatsApp API credentials not configured.");
+    }
+
+    // Format phone number
+    const cleanPhone = phone.replace(/[\+\s\-]/g, '');
+
+    // Try to send a test message to check if number is on WhatsApp
+    // Meta doesn't provide a direct check endpoint, so we attempt to send
+    const response = await axios.post(
+      `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`,
+      {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: cleanPhone,
+        type: "text",
+        text: {
+          body: "Test",
+        },
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 10000,
+      }
+    );
+
+    // If successful, number is on WhatsApp
+    // Delete the test message if possible (not always supported)
+    return {
+      isOnWhatsApp: true,
+    };
+
+  } catch (error) {
+    // Check if error indicates number not on WhatsApp
+    const errorMessage = error.response?.data?.error?.message || error.message;
+    
+    if (errorMessage.includes("not registered") || 
+        errorMessage.includes("no WhatsApp account") ||
+        errorMessage.includes("phone number") ||
+        error.response?.status === 404) {
+      return {
+        isOnWhatsApp: false,
+        error: errorMessage,
+      };
+    }
+
+    // Other errors (e.g., API credentials, rate limits)
+    throw error;
+  }
+};
+
+// ==========================================
+// SEND WHATSAPP MESSAGE (Meta Cloud API)
 // ==========================================
 
 export const sendWhatsAppMessage = async ({
@@ -17,6 +81,15 @@ export const sendWhatsAppMessage = async ({
   type = "INVITATION",
 }) => {
   try {
+    // Validate required environment variables
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    const apiVersion = process.env.WHATSAPP_API_VERSION || "v25.0";
+
+    if (!phoneNumberId || !accessToken) {
+      throw new Error("WhatsApp API credentials not configured. Please set WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN environment variables.");
+    }
+
     // Create notification record
     const notification = await prisma.notification.create({
       data: {
@@ -30,29 +103,40 @@ export const sendWhatsAppMessage = async ({
       },
     });
 
-    // Send via WhatsApp API
+    // Format phone number (remove +, spaces, dashes)
+    const cleanPhone = to.replace(/[\+\s\-]/g, '');
+
+    // Send via Meta WhatsApp Cloud API
     const response = await axios.post(
-      `${process.env.WHATSAPP_BASE_URL}/send`,
+      `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`,
       {
-        api_key: process.env.WHATSAPP_API_KEY,
-        to,
-        message,
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: cleanPhone,
+        type: "text",
+        text: {
+          preview_url: true,
+          body: message,
+        },
       },
       {
         headers: {
+          "Authorization": `Bearer ${accessToken}`,
           "Content-Type": "application/json",
-          Accept: "application/json",
         },
         timeout: 15000,
       }
     );
+
+    // Extract message ID from response
+    const messageId = response.data?.messages?.[0]?.id;
 
     // Update notification as sent
     await prisma.notification.update({
       where: { id: notification.id },
       data: {
         status: "SENT",
-        providerRef: response.data?.messageId || null,
+        providerRef: messageId || null,
         sentAt: new Date(),
       },
     });
@@ -60,7 +144,7 @@ export const sendWhatsAppMessage = async ({
     return {
       success: true,
       notificationId: notification.id,
-      providerRef: response.data?.messageId || null,
+      providerRef: messageId || null,
     };
 
   } catch (error) {

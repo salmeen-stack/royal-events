@@ -5,6 +5,7 @@ import {
   getInvitationById,
   generateGuestInvitation,
   sendGuestInvitation,
+  sendViaWhatsApp,
   releaseInvitation,
   bulkGenerateEventInvitations,
   verifyByQRToken,
@@ -30,5 +31,6 @@ router.post("/generate", generateGuestInvitation);
 router.post("/bulk-generate", bulkGenerateEventInvitations);
 router.post("/release", releaseInvitation);
 router.post("/:id/send", sendGuestInvitation);
+router.post("/:id/send-whatsapp", sendViaWhatsApp);
 
 export default router;

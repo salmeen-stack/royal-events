@@ -38,6 +38,11 @@ const invitationService = {
     return response.data;
   },
 
+  sendWhatsApp: async (id) => {
+    const response = await api.post(`/api/invitations/${id}/send-whatsapp`);
+    return response.data;
+  },
+
   verifyQR: async (token) => {
     const response = await api.get(`/api/invitations/verify/qr/${token}`);
     return response.data;

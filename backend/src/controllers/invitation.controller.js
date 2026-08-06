@@ -170,6 +170,91 @@ export const sendGuestInvitation = async (req, res) => {
 };
 
 // ==========================================
+// SEND INVITATION VIA WHATSAPP
+// ==========================================
+
+export const sendViaWhatsApp = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const invitation = await prisma.invitation.findUnique({
+      where: { id },
+      include: {
+        guest: true,
+        event: true,
+      },
+    });
+
+    if (!invitation) {
+      return errorResponse(res, "Invitation not found.", 404);
+    }
+
+    if (invitation.status === "SENT" || invitation.status === "DELIVERED") {
+      return errorResponse(res, "Invitation has already been sent.", 400);
+    }
+
+    const { sendWhatsAppInvitation, checkWhatsAppNumber } = await import("../services/whatsapp.service.js");
+    const { sendInvitationSMS } = await import("../services/sms.service.js");
+
+    let result;
+    let usedChannel = "WHATSAPP";
+
+    // Check if guest phone is on WhatsApp
+    try {
+      const whatsappCheck = await checkWhatsAppNumber(invitation.guest.phone);
+      
+      if (whatsappCheck.isOnWhatsApp) {
+        // Number is on WhatsApp, send via WhatsApp
+        result = await sendWhatsAppInvitation({
+          guest: invitation.guest,
+          event: invitation.event,
+          invitation,
+          qrCodeBase64: invitation.qrCodeUrl,
+        });
+        usedChannel = "WHATSAPP";
+      } else {
+        // Number not on WhatsApp, fallback to SMS
+        console.log(`Number ${invitation.guest.phone} not on WhatsApp, falling back to SMS`);
+        result = await sendInvitationSMS({
+          guest: invitation.guest,
+          event: invitation.event,
+          smsToken: invitation.smsToken,
+        });
+        usedChannel = "SMS";
+      }
+    } catch (error) {
+      // WhatsApp check failed, fallback to SMS
+      console.error("WhatsApp check failed, falling back to SMS:", error.message);
+      result = await sendInvitationSMS({
+        guest: invitation.guest,
+        event: invitation.event,
+        smsToken: invitation.smsToken,
+      });
+      usedChannel = "SMS";
+    }
+
+    if (!result.success) {
+      return errorResponse(res, result.error || "Failed to send invitation.");
+    }
+
+    // Update invitation status
+    await prisma.invitation.update({
+      where: { id },
+      data: {
+        status: "SENT",
+        sentAt: new Date(),
+      },
+    });
+
+    return successResponse(res, `Invitation sent via ${usedChannel} successfully.`, { ...result, usedChannel });
+
+  } catch (error) {
+    console.error("Send via WhatsApp error:", error);
+    return errorResponse(res, "Failed to send invitation.", 500);
+  }
+};
+
+// ==========================================
 // RELEASE INVITATION AFTER PAYMENT
 // ==========================================
 

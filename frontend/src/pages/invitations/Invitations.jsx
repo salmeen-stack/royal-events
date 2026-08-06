@@ -92,44 +92,16 @@ const Invitations = () => {
     }
   };
 
-  const handleSendViaWhatsApp = (invitation) => {
-    const { guest, event, invitationRef, qrToken } = invitation;
-    
-    // Format phone number (remove +, spaces, dashes)
-    const cleanPhone = guest?.phone?.replace(/[\+\s\-]/g, '');
-    
-    if (!cleanPhone) {
-      toast.error("Guest phone number not available");
-      return;
+  const handleSendViaWhatsApp = async (invitation) => {
+    try {
+      const response = await invitationService.sendWhatsApp(invitation.id);
+      if (response.success) {
+        toast.success("Invitation sent via WhatsApp!");
+        fetchInvitations();
+      }
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     }
-
-    const eventDate = new Date(event?.eventDate).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-
-    const invitationLink = `${window.location.origin}/invitation/${qrToken}`;
-
-    const message =
-      `💒 *Wedding Invitation*\n\n` +
-      `Dear *${guest?.name}*,\n\n` +
-      `You are officially invited to:\n\n` +
-      `📌 *Event:* ${event?.name}\n` +
-      `📅 *Date:* ${eventDate}\n` +
-      `⏰ *Time:* ${event?.eventTime}\n` +
-      `📍 *Venue:* ${event?.venue}\n` +
-      `🗺️ *Location:* ${event?.location}\n\n` +
-      `*Invitation Reference:* ${invitationRef}\n\n` +
-      `🎁 *Click below to view your beautiful invitation card with your QR code:*\n` +
-      `${invitationLink}\n\n` +
-      `Present your QR code at the event entrance for check-in.\n\n` +
-      `We look forward to celebrating with you! 🎊`;
-
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
-    
-    window.open(whatsappUrl, '_blank');
   };
 
   const handleBulkGenerate = async () => {

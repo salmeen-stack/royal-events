@@ -2,7 +2,7 @@
 import cron from "node-cron";
 import prisma from "../config/prisma.js";
 import { sendContributionReminderSMS, sendEventReminderSMS } from "../services/sms.service.js";
-import { sendWhatsAppEventReminder } from "../services/whatsapp.service.js";
+import { sendWhatsAppEventReminder, checkWhatsAppNumber, sendWhatsAppMessage } from "../services/whatsapp.service.js";
 
 // ==========================================
 // CALCULATE DAYS UNTIL EVENT
@@ -47,12 +47,52 @@ export const startContributionReminderJob = () => {
         });
 
         for (const contribution of pendingContributions) {
-          await sendContributionReminderSMS({
-            guest: contribution.guest,
-            event,
-            contributionLink: contribution.contributionLink,
-            balanceAmount: contribution.balanceAmount,
-          });
+          // Check if guest phone is on WhatsApp
+          try {
+            const whatsappCheck = await checkWhatsAppNumber(contribution.guest.phone);
+            
+            if (whatsappCheck.isOnWhatsApp) {
+              // Send via WhatsApp
+              const eventDate = new Date(event.eventDate).toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              });
+
+              const message =
+                `Hello *${contribution.guest.name}*,\n\n` +
+                `You have been invited to support:\n\n` +
+                `📌 *${event.name}*\n\n` +
+                `Please use the link below to make your contribution:\n` +
+                `${contribution.contributionLink}\n\n` +
+                `Thank you for your support. 🙏`;
+
+              await sendWhatsAppMessage({
+                to: contribution.guest.phone,
+                message,
+                eventId: event.id,
+                guestId: contribution.guest.id,
+                type: "CONTRIBUTION_REQUEST",
+              });
+            } else {
+              // Fallback to SMS
+              await sendContributionReminderSMS({
+                guest: contribution.guest,
+                event,
+                contributionLink: contribution.contributionLink,
+                balanceAmount: contribution.balanceAmount,
+              });
+            }
+          } catch (error) {
+            // WhatsApp check failed, fallback to SMS
+            console.error("WhatsApp check failed for contribution reminder, using SMS:", error.message);
+            await sendContributionReminderSMS({
+              guest: contribution.guest,
+              event,
+              contributionLink: contribution.contributionLink,
+              balanceAmount: contribution.balanceAmount,
+            });
+          }
 
           await new Promise((resolve) => setTimeout(resolve, 200));
         }
@@ -125,16 +165,28 @@ export const startEventReminderJob = () => {
         for (const invitation of invitations) {
           let result;
 
-          if (
-            invitation.channel === "WHATSAPP" ||
-            invitation.channel === "BOTH"
-          ) {
-            result = await sendWhatsAppEventReminder({
-              guest: invitation.guest,
-              event,
-              daysUntilEvent,
-            });
-          } else {
+          // Check if guest phone is on WhatsApp
+          try {
+            const whatsappCheck = await checkWhatsAppNumber(invitation.guest.phone);
+            
+            if (whatsappCheck.isOnWhatsApp) {
+              // Send via WhatsApp
+              result = await sendWhatsAppEventReminder({
+                guest: invitation.guest,
+                event,
+                daysUntilEvent,
+              });
+            } else {
+              // Fallback to SMS
+              result = await sendEventReminderSMS({
+                guest: invitation.guest,
+                event,
+                daysUntilEvent,
+              });
+            }
+          } catch (error) {
+            // WhatsApp check failed, fallback to SMS
+            console.error("WhatsApp check failed for event reminder, using SMS:", error.message);
             result = await sendEventReminderSMS({
               guest: invitation.guest,
               event,
