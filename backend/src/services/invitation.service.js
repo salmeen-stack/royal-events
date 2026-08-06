@@ -214,21 +214,16 @@ export const releaseInvitationAfterPayment = async ({ contributionId }) => {
 
 export const bulkGenerateInvitations = async ({ eventId, channel = "SMS" }) => {
   try {
-    // Get all paid contributions for this event
-    const paidContributions = await prisma.contribution.findMany({
-      where: {
-        eventId,
-        status: "PAID",
-      },
-      include: {
-        guest: true,
-      },
+    // Get event details to check if contribution is required
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      select: { requiresContribution: true },
     });
 
-    if (paidContributions.length === 0) {
+    if (!event) {
       return {
         success: false,
-        error: "No paid contributions found for this event.",
+        error: "Event not found.",
       };
     }
 
@@ -239,11 +234,50 @@ export const bulkGenerateInvitations = async ({ eventId, channel = "SMS" }) => {
       errors: [],
     };
 
-    for (const contribution of paidContributions) {
+    let guestsToInvite = [];
+
+    if (event.requiresContribution) {
+      // If contribution is required, only get guests with paid contributions
+      const paidContributions = await prisma.contribution.findMany({
+        where: {
+          eventId,
+          status: "PAID",
+        },
+        include: {
+          guest: true,
+        },
+      });
+
+      if (paidContributions.length === 0) {
+        return {
+          success: false,
+          error: "No paid contributions found for this event.",
+        };
+      }
+
+      guestsToInvite = paidContributions.map(c => c.guest);
+    } else {
+      // If contribution is not required, get all guests who require invitations
+      guestsToInvite = await prisma.guest.findMany({
+        where: {
+          eventId,
+          requiresInvitation: true,
+        },
+      });
+
+      if (guestsToInvite.length === 0) {
+        return {
+          success: false,
+          error: "No guests found who require invitations for this event.",
+        };
+      }
+    }
+
+    for (const guest of guestsToInvite) {
       // Check if invitation already exists
       const existingInvitation = await prisma.invitation.findFirst({
         where: {
-          guestId: contribution.guestId,
+          guestId: guest.id,
           eventId,
         },
       });
@@ -254,7 +288,7 @@ export const bulkGenerateInvitations = async ({ eventId, channel = "SMS" }) => {
       }
 
       const invitationResult = await generateInvitation({
-        guestId: contribution.guestId,
+        guestId: guest.id,
         eventId,
         channel,
       });
@@ -264,7 +298,7 @@ export const bulkGenerateInvitations = async ({ eventId, channel = "SMS" }) => {
       } else {
         results.failed++;
         results.errors.push({
-          guest: contribution.guest.name,
+          guest: guest.name,
           error: invitationResult.error,
         });
       }

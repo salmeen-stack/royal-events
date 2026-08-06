@@ -283,6 +283,7 @@ const Guests = () => {
                   <Table.Header>Category</Table.Header>
                   <Table.Header>Expected</Table.Header>
                   <Table.Header>Status</Table.Header>
+                  <Table.Header>Type</Table.Header>
                   <Table.Header>Invitation</Table.Header>
                   <Table.Header>Actions</Table.Header>
                 </tr>
@@ -319,6 +320,17 @@ const Guests = () => {
                         />
                       </Table.Cell>
                       <Table.Cell>
+                        {guest.requiresInvitation ? (
+                          <span className="text-xs text-indigo-600 font-medium">
+                            Invitation
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-500">
+                            Reminder only
+                          </span>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell>
                         {guest.invitations && guest.invitations.length > 0 ? (
                           <Badge
                             status={guest.invitations[0].status}
@@ -345,7 +357,7 @@ const Guests = () => {
                   ))
                 ) : (
                   <Table.Empty
-                    colSpan={7}
+                    colSpan={8}
                     message="No guests found"
                     icon="users-slash"
                   />

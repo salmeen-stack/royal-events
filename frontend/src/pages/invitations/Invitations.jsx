@@ -12,6 +12,7 @@ import Pagination from "../../components/ui/Pagination";
 import Spinner from "../../components/ui/Spinner";
 import Select from "../../components/ui/Select";
 import invitationService from "../../services/invitation.service";
+import eventService from "../../services/event.service";
 import usePagination from "../../hooks/usePagination";
 import useDebounce from "../../hooks/useDebounce";
 import { formatDateTime } from "../../utils/formatters";
@@ -28,6 +29,8 @@ const Invitations = () => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [channelFilter, setChannelFilter] = useState("");
+  const [eventFilter, setEventFilter] = useState(eventIdParam);
+  const [events, setEvents] = useState([]);
   const [generatingBulk, setGeneratingBulk] = useState(false);
   const debouncedSearch = useDebounce(search);
   const pagination = usePagination();
@@ -35,8 +38,23 @@ const Invitations = () => {
   const canManageInvitations = user?.role === "SUPER_ADMIN" || user?.role === "STAFF";
 
   useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  useEffect(() => {
     fetchInvitations();
-  }, [pagination.page, debouncedSearch, statusFilter, channelFilter]);
+  }, [pagination.page, debouncedSearch, statusFilter, channelFilter, eventFilter]);
+
+  const fetchEvents = async () => {
+    try {
+      const response = await eventService.getAll({ limit: 100 });
+      if (response.success) {
+        setEvents(response.data.map(e => ({ value: e.id, label: e.name })));
+      }
+    } catch (err) {
+      console.error("Fetch events error:", err);
+    }
+  };
 
   const fetchInvitations = async () => {
     try {
@@ -48,7 +66,7 @@ const Invitations = () => {
       if (debouncedSearch) params.search = debouncedSearch;
       if (statusFilter) params.status = statusFilter;
       if (channelFilter) params.channel = channelFilter;
-      if (eventIdParam) params.eventId = eventIdParam;
+      if (eventFilter) params.eventId = eventFilter;
 
       const response = await invitationService.getAll(params);
       if (response.success) {
@@ -66,7 +84,7 @@ const Invitations = () => {
     try {
       const response = await invitationService.send(id);
       if (response.success) {
-        toast.success("Invitation sent!");
+        toast.success("Invitation sent via SMS!");
         fetchInvitations();
       }
     } catch (err) {
@@ -167,6 +185,14 @@ const Invitations = () => {
           </div>
           <div className="w-full sm:w-40">
             <Select
+              options={events}
+              placeholder="All Events"
+              value={eventFilter}
+              onChange={(e) => setEventFilter(e.target.value)}
+            />
+          </div>
+          <div className="w-full sm:w-40">
+            <Select
               options={INVITATION_STATUS}
               placeholder="All Status"
               value={statusFilter}
@@ -234,7 +260,7 @@ const Invitations = () => {
                             <button
                               onClick={() => handleSend(inv.id)}
                               className="p-1.5 rounded text-indigo-600 hover:bg-indigo-50 transition-colors"
-                              title="Send Invitation via SMS"
+                              title="Send via SMS"
                             >
                               <FontAwesomeIcon icon="paper-plane" className="text-xs" />
                             </button>

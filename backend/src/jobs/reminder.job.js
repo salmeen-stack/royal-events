@@ -259,6 +259,228 @@ export const startEventStatusUpdateJob = () => {
 };
 
 // ==========================================
+// PENDING REMINDER JOB
+// Runs every minute to check for pending reminders
+// ==========================================
+
+export const startPendingReminderJob = () => {
+  cron.schedule("* * * * *", async () => {
+    try {
+      const now = new Date();
+
+      // Find pending reminders that are due (scheduledAt <= now)
+      // Use a transaction to prevent duplicate processing
+      const pendingReminders = await prisma.reminder.findMany({
+        where: {
+          status: "PENDING",
+          scheduledAt: {
+            lte: now,
+          },
+        },
+        include: {
+          event: true,
+        },
+      });
+
+      if (pendingReminders.length === 0) return;
+
+      for (const reminder of pendingReminders) {
+        try {
+          // Mark as PROCESSING immediately to prevent duplicate processing
+          const updated = await prisma.reminder.updateMany({
+            where: {
+              id: reminder.id,
+              status: "PENDING",
+            },
+            data: {
+              status: "PROCESSING",
+            },
+          });
+
+          // If another job already started processing this, skip it
+          if (updated.count === 0) {
+            console.log(`⏭️ Skipping reminder ${reminder.id} - already being processed`);
+            continue;
+          }
+
+          console.log(`🔔 Processing reminder ${reminder.id} of type ${reminder.type}`);
+
+          if (reminder.type === "EVENT_REMINDER") {
+            const daysUntilEvent = getDaysUntilEvent(reminder.event.eventDate);
+            
+            // Get all guests for this event (both invitation and reminder-only)
+            const guests = await prisma.guest.findMany({
+              where: {
+                eventId: reminder.event.id,
+              },
+            });
+
+            let successCount = 0;
+            let failedCount = 0;
+
+            for (const guest of guests) {
+              try {
+                const result = await sendEventReminderSMS({
+                  guest,
+                  event: reminder.event,
+                  daysUntilEvent,
+                });
+                if (result.success) {
+                  successCount++;
+                } else {
+                  failedCount++;
+                  console.error(`❌ Failed to send to ${guest.name}:`, result.error);
+                }
+                await new Promise((resolve) => setTimeout(resolve, 200));
+              } catch (err) {
+                failedCount++;
+                console.error(`❌ Error sending to ${guest.name}:`, err.message);
+              }
+            }
+
+            await prisma.reminder.update({
+              where: { id: reminder.id },
+              data: {
+                status: "SENT",
+                sentAt: new Date(),
+                message: `Event reminder sent to ${successCount} guests, ${failedCount} failed.`,
+              },
+            });
+
+            console.log(`✅ Sent reminder ${reminder.id} - ${successCount} successful, ${failedCount} failed`);
+
+          } else if (reminder.type === "CONTRIBUTION_REMINDER") {
+            const contributions = await prisma.contribution.findMany({
+              where: {
+                eventId: reminder.event.id,
+                status: { in: ["PENDING", "PARTIAL"] },
+              },
+              include: { guest: true },
+            });
+
+            let successCount = 0;
+            let failedCount = 0;
+
+            for (const contribution of contributions) {
+              try {
+                const result = await sendContributionReminderSMS({
+                  guest: contribution.guest,
+                  event: reminder.event,
+                  contributionLink: contribution.contributionLink,
+                  balanceAmount: contribution.balanceAmount,
+                });
+                if (result.success) {
+                  successCount++;
+                } else {
+                  failedCount++;
+                  console.error(`❌ Failed to send to ${contribution.guest.name}:`, result.error);
+                }
+                await new Promise((resolve) => setTimeout(resolve, 200));
+              } catch (err) {
+                failedCount++;
+                console.error(`❌ Error sending to ${contribution.guest.name}:`, err.message);
+              }
+            }
+
+            await prisma.reminder.update({
+              where: { id: reminder.id },
+              data: {
+                status: "SENT",
+                sentAt: new Date(),
+                message: `Contribution reminder sent to ${successCount} guests, ${failedCount} failed.`,
+              },
+            });
+
+            console.log(`✅ Sent reminder ${reminder.id} - ${successCount} successful, ${failedCount} failed`);
+
+          } else if (reminder.type === "CHECKIN_REMINDER") {
+            // Get all checked-in guests
+            const checkins = await prisma.checkin.findMany({
+              where: {
+                eventId: reminder.event.id,
+              },
+              include: { guest: true },
+            });
+
+            let successCount = 0;
+            let failedCount = 0;
+
+            for (const checkin of checkins) {
+              try {
+                // Send thank you SMS
+                const result = await sendEventReminderSMS({
+                  guest: checkin.guest,
+                  event: reminder.event,
+                  daysUntilEvent: 0,
+                });
+                if (result.success) {
+                  successCount++;
+                } else {
+                  failedCount++;
+                  console.error(`❌ Failed to send to ${checkin.guest.name}:`, result.error);
+                }
+                await new Promise((resolve) => setTimeout(resolve, 200));
+              } catch (err) {
+                failedCount++;
+                console.error(`❌ Error sending to ${checkin.guest.name}:`, err.message);
+              }
+            }
+
+            await prisma.reminder.update({
+              where: { id: reminder.id },
+              data: {
+                status: "SENT",
+                sentAt: new Date(),
+                message: `Check-in reminder sent to ${successCount} guests, ${failedCount} failed.`,
+              },
+            });
+
+            console.log(`✅ Sent reminder ${reminder.id} - ${successCount} successful, ${failedCount} failed`);
+          }
+        } catch (error) {
+          console.error(`❌ Error processing reminder ${reminder.id}:`, error);
+          // Only mark as failed if it's not a database connection error
+          // Database errors should be retried on next run
+          if (!error.message.includes('ETIMEDOUT') && !error.message.includes('WebSocket')) {
+            try {
+              await prisma.reminder.update({
+                where: { id: reminder.id },
+                data: {
+                  status: "FAILED",
+                  message: error.message,
+                },
+              });
+            } catch (dbError) {
+              console.error(`❌ Failed to mark reminder as failed:`, dbError.message);
+            }
+          } else {
+            // Revert to PENDING for database connection errors so it can be retried
+            try {
+              await prisma.reminder.update({
+                where: { id: reminder.id },
+                data: {
+                  status: "PENDING",
+                },
+              });
+            } catch (dbError) {
+              console.error(`❌ Failed to revert reminder to PENDING:`, dbError.message);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("❌ Pending reminder job error:", error);
+      // Don't crash the job on database errors, just log and continue
+      if (error.message.includes('ETIMEDOUT') || error.message.includes('WebSocket')) {
+        console.log("⚠️ Database connection timeout - will retry on next run");
+      }
+    }
+  });
+
+  console.log("✅ Pending reminder job scheduled - runs every minute");
+};
+
+// ==========================================
 // START ALL JOBS
 // ==========================================
 
@@ -271,6 +493,7 @@ export const startAllJobs = () => {
   startEventReminderJob();
   startOverdueContributionJob();
   startEventStatusUpdateJob();
+  startPendingReminderJob();
 
   console.log("==========================================");
   console.log("✅ All background jobs started");

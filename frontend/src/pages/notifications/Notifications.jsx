@@ -9,6 +9,7 @@ import Pagination from "../../components/ui/Pagination";
 import Spinner from "../../components/ui/Spinner";
 import Select from "../../components/ui/Select";
 import notificationService from "../../services/notification.service";
+import eventService from "../../services/event.service";
 import usePagination from "../../hooks/usePagination";
 import useDebounce from "../../hooks/useDebounce";
 import { formatDateTime, truncateText } from "../../utils/formatters";
@@ -24,16 +25,38 @@ const NOTIFICATION_STATUS_OPTIONS = [
 
 const Notifications = () => {
   const [notifications, setNotifications] = useState([]);
+  const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [eventFilter, setEventFilter] = useState("");
   const debouncedSearch = useDebounce(search);
   const pagination = usePagination();
 
   useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  useEffect(() => {
     fetchNotifications();
-  }, [pagination.page, debouncedSearch, typeFilter, statusFilter]);
+  }, [pagination.page, debouncedSearch, typeFilter, statusFilter, eventFilter]);
+
+  const fetchEvents = async () => {
+    try {
+      const response = await eventService.getAll({ limit: 100 });
+      if (response.success) {
+        setEvents(
+          response.data.map((event) => ({
+            value: event.id,
+            label: event.name,
+          }))
+        );
+      }
+    } catch (err) {
+      console.error("Fetch events error:", err);
+    }
+  };
 
   const fetchNotifications = async () => {
     try {
@@ -45,6 +68,7 @@ const Notifications = () => {
       if (debouncedSearch) params.search = debouncedSearch;
       if (typeFilter) params.type = typeFilter;
       if (statusFilter) params.status = statusFilter;
+      if (eventFilter) params.eventId = eventFilter;
 
       const response = await notificationService.getAll(params);
       if (response.success) {
@@ -74,6 +98,14 @@ const Notifications = () => {
               placeholder="Search notifications..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="w-full sm:w-48">
+            <Select
+              options={events}
+              placeholder="All Events"
+              value={eventFilter}
+              onChange={(e) => setEventFilter(e.target.value)}
             />
           </div>
           <div className="w-full sm:w-48">

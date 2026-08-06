@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import toast from "react-hot-toast";
 import PageHeader from "../../components/layout/PageHeader";
@@ -33,6 +33,7 @@ const CheckIn = () => {
   useEffect(() => {
     if (mode !== "qr") {
       if (qrScannerRef.current) {
+        qrScannerRef.current.stop().catch(() => {});
         qrScannerRef.current.clear().catch(() => {});
       }
       setScannerReady(false);
@@ -40,40 +41,41 @@ const CheckIn = () => {
     }
 
     let cancelled = false;
-    const scanner = new Html5QrcodeScanner(
-      qrRegionId,
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
-        disableFlip: false,
-        facingMode: "environment",
-      },
-      false
-    );
+    const html5QrCode = new Html5Qrcode(qrRegionId);
+    qrScannerRef.current = html5QrCode;
 
-    qrScannerRef.current = scanner;
+    const config = {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0,
+    };
 
-    scanner.render(
+    html5QrCode.start(
+      { facingMode: "environment" },
+      config,
       async (decodedText) => {
         if (cancelled) return;
         const token = extractTokenFromQRValue(decodedText);
         if (!token) {
           return;
         }
-        await scanner.clear().catch(() => {});
+        await html5QrCode.stop().catch(() => {});
         await handleQRCheckIn(token);
       },
       () => {
         // Silently ignore scanning errors
       }
-    );
-
-    setScannerReady(true);
+    ).then(() => {
+      setScannerReady(true);
+    }).catch((err) => {
+      console.error("Camera start error:", err);
+      setError("Failed to start camera. Please ensure camera permissions are granted.");
+    });
 
     return () => {
       cancelled = true;
       if (qrScannerRef.current) {
+        qrScannerRef.current.stop().catch(() => {});
         qrScannerRef.current.clear().catch(() => {});
       }
       qrScannerRef.current = null;

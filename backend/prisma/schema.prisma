@@ -72,6 +72,7 @@ model Event {
   location             String
   googleMapsUrl        String?
   imageUrl             String?
+  requiresContribution Boolean     @default(true)
   contributionTarget   Decimal     @default(0)
   contributionDeadline DateTime?
   paymentInstructions  String?

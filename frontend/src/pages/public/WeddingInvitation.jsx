@@ -75,16 +75,12 @@ const WeddingInvitation = () => {
     const ctx = canvas.getContext("2d");
     const rect = canvas.getBoundingClientRect();
     
-    // Calculate scale factors to handle CSS resizing
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
     ctx.globalCompositeOperation = "destination-out";
     ctx.beginPath();
-    ctx.arc(x, y, 50 * scaleX, 0, Math.PI * 2);
+    ctx.arc(x, y, 30, 0, Math.PI * 2);
     ctx.fill();
 
     // Check how much has been scratched
@@ -149,14 +145,9 @@ const WeddingInvitation = () => {
 
     const ctx = canvas.getContext("2d");
     
-    // Get the container dimensions
-    const container = canvas.parentElement;
-    const containerWidth = container.offsetWidth;
-    const containerHeight = container.offsetHeight;
-    
-    // Set canvas dimensions to match container
-    canvas.width = containerWidth;
-    canvas.height = containerHeight;
+    // Use fixed dimensions since container has fixed dimensions
+    canvas.width = 300;
+    canvas.height = 300;
 
     // Create scratch overlay
     const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
